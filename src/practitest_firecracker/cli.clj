@@ -21,6 +21,10 @@
     "JSON containing the fields that should be added when creating PractiTest Test"
     :default {}
     :parse-fn #(json/parse-string % true)]
+   [nil "--additional-testset-fields JSON"
+    "JSON containing the fields that should be added when creating PractiTest TestSet"
+    :default {}
+    :parse-fn #(json/parse-string % true)]
    ["-h" "--help"]])
 
 (defn usage [options-summary]

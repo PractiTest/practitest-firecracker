@@ -22,6 +22,7 @@
                                                             (:author-id options)
                                                             (:additional-test-fields options)
                                                             (:testset-name options)
+                                                            (:additional-testset-fields options)
                                                             reports)]
                              (exit 0 (format "TestSet ID: %s" (:id testset))))
           "populate-testset" (do

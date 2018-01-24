@@ -31,6 +31,7 @@ java -jar practitest-firecracker-standaline.jar \
     --testset-name="TestSet name" \
     --author-id=PRACTITEST_USER_ID \
     --additional-test-fields '{"custom-fields": {"---f-123": "foo", "---f-124": "bar"}}' \
+    --additional-testset-fields '{"custom-fields": {"---f-125": "baz"}}' \
     create-testset
 
 ```

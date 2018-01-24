@@ -154,9 +154,9 @@
       test
       (ll-create-test client project-id (merge test-def {:author-id author-id} additional-fields) step-defs))))
 
-(defn create-sf-testset [client project-id author-id additional-fields sf-name sf-test-suites]
-  (let [tests (map (partial create-sf-test client project-id author-id additional-fields) sf-test-suites)]
-    (ll-create-testset client project-id {:name sf-name} (map :id tests))))
+(defn create-sf-testset [client project-id author-id additional-test-fields sf-name additional-testset-fields sf-test-suites]
+  (let [tests (map (partial create-sf-test client project-id author-id additional-test-fields) sf-test-suites)]
+    (ll-create-testset client project-id (merge {:name sf-name} additional-testset-fields) (map :id tests))))
 
 (defn sf-test-case->run-step-def [test-case]
   {:name           (:full-name test-case)
