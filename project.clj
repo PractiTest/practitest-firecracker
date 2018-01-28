@@ -1,4 +1,4 @@
-(defproject practitest-firecracker "0.2.0"
+(defproject practitest-firecracker "0.3.0"
   :description "FIXME: write description"
   :url "http://example.com/FIXME"
 
