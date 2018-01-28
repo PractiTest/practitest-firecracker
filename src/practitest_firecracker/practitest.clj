@@ -28,8 +28,10 @@
 (def ^:const test-steps-uri "/projects/%d/steps.json")
 (def ^:const create-test-uri "/projects/%d/tests.json")
 (def ^:const create-testset-uri "/projects/%d/sets.json")
+(def ^:const create-instance-uri "/projects/%d/instances.json")
 (def ^:const create-run-uri "/projects/%d/runs.json")
 (def ^:const list-tests-uri "/projects/%d/tests.json")
+(def ^:const list-testsets-uri "/projects/%d/sets.json")
 
 ;; ===========================================================================
 ;; API
@@ -85,6 +87,15 @@
                                     :attributes attributes
                                     :instances  {:test-ids test-ids}}}})))
 
+(defn ll-create-instance [{:keys [base-uri credentials]} project-id testset-id test-id]
+  (let [uri (build-uri base-uri create-instance-uri project-id)]
+    (api-call {:credentials credentials
+               :uri         uri
+               :method      http/post
+               :form-params {:data {:type       "instances"
+                                    :attributes {:set-id  testset-id
+                                                 :test-id test-id}}}})))
+
 (defn ll-create-run [{:keys [base-uri credentials]} project-id instance-id attributes steps]
   (let [uri (build-uri base-uri create-run-uri project-id)]
     (api-call {:credentials credentials
@@ -111,6 +122,14 @@
                 :method       http/get
                 :query-params {:set-ids  testset-id
                                :test-ids test-id}}))))
+
+(defn ll-find-testset [{:keys [base-uri credentials]} project-id name]
+  (let [uri (build-uri base-uri list-testsets-uri project-id)]
+    (first
+     (api-call {:credentials  credentials
+                :uri          uri
+                :method       http/get
+                :query-params {:name_exact name}}))))
 
 (defn testset [client project-id id]
   (let [testset   (ll-testset client project-id id)
@@ -194,3 +213,28 @@
                   instance  (ll-find-instance client project-id testset-id (:id test))
                   [run run-steps] (sf-test-suite->run-def sf-test-suite)]]
       (ll-create-run client project-id (:id instance) run run-steps))))
+
+(defn find-sf-testset [client project-id testset-name]
+  (ll-find-testset client project-id testset-name))
+
+(defn create-or-update-sf-testset [client project-id author-id additional-test-fields sf-name additional-testset-fields sf-test-suites]
+  ;; find the testset
+  (if-let [testset (find-sf-testset client project-id sf-name)]
+    (let [instances (ll-testset-instances client project-id (:id testset))
+          tests     (map (fn [test-suite]
+                           (let [name (str (:package-name test-suite) ":" (:name test-suite))]
+                             [name test-suite (ll-find-test client project-id name)]))
+                         sf-test-suites)
+          nil-tests (filter #(nil? (last %)) tests)]
+      (when (seq nil-tests)
+        ;; create missing tests add add them to the testset
+        (let [new-tests (map (partial create-sf-test client project-id author-id additional-test-fields)
+                             (map second nil-tests))]
+          (doseq [t new-tests]
+            (ll-create-instance client project-id (:id testset) (:id t)))))
+      ;; add any missing instances to the testset
+      (doseq [test-id (difference (set (map #(read-string (:id (last %))) tests))
+                                  (set (map #(get-in % [:attributes :test-id]) instances)))]
+        (ll-create-instance client project-id (:id testset) test-id))
+      testset)
+    (create-sf-test client project-id author-id additional-test-fields sf-name additional-testset-fields sf-test-suites)))

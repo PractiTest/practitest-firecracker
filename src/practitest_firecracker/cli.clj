@@ -36,15 +36,19 @@
         options-summary
         ""
         "Actions:"
-        "  create-testset    Analyzes the given Surefire reports directory and creates a TestSet with Tests and Steps in PractiTest to reflect"
-        "                    the structure of the report. Returns a TestSet ID that you should use to run the 'populate-testset' action"
-        "  populate-testset  Analyzes the given Surefire reports directory and populates the given TestSet with the data from the report"
+        "  create-testset              Analyzes the given Surefire reports directory and creates a TestSet with Tests and Steps in PractiTest to reflect"
+        "                              the structure of the report. Returns a TestSet ID that you should use to run the 'populate-testset' action"
+        "  populate-testset            Analyzes the given Surefire reports directory and populates the given TestSet with the data from the report"
+        "  create-and-populate-testset Shortcut to perform both actions. If the TestSet with the given name already exists, it will be reused. If it exists, but has completely different set of tests, an error will be reported."
         ""]
        (string/join \newline)))
 
 (defn error-msg [errors]
   (str "The following errors occurred while parsing your command:\n\n"
        (string/join \newline errors)))
+
+(defn missing-option-msg [action-name option-name]
+  (format "%s is required for '%s' action" option-name action-name))
 
 (defn parse-args [args]
   (let [{:keys [options arguments errors summary]} (parse-opts args cli-options)]
@@ -58,13 +62,13 @@
       (= "create-testset" (first arguments))
       (cond
         (nil? (:project-id options))
-        {:exit-message "project-id is required for 'create-testset' action"}
+        {:exit-message (missing-option-msg "create-testset" "project-id")}
 
         (nil? (:author-id options))
-        {:exit-message "author-id is required for 'create-testset' action"}
+        {:exit-message (missing-option-msg "create-testset" "author-id")}
 
         (nil? (:testset-name options))
-        {:exit-message "testset-name is required for 'create-testset' action"}
+        {:exit-message (missing-option-msg "create-testset" "testset-name")}
 
         :else
         {:action "create-testset" :options options})
@@ -72,13 +76,27 @@
       (= "populate-testset" (first arguments))
       (cond
         (nil? (:project-id options))
-        {:exit-message "project-id is required for 'populate-testset' action"}
+        {:exit-message (missing-option-msg "populate-testset" "project-id")}
 
         (nil? (:testset-id options))
-        {:exit-message "testset-id is required for 'populate-testset' action"}
+        {:exit-message (missing-option-msg "populate-testset" "testset-id")}
 
         :else
         {:action "populate-testset" :options options})
+
+      (= "create-and-populate-testset" (first arguments))
+      (cond
+        (nil? (:project-id options))
+        {:exit-message (missing-option-msg "create-and-populate-testset" "project-id")}
+
+        (nil? (:author-id options))
+        {:exit-message (missing-option-msg "create-and-populate-testset" "author-id")}
+
+        (nil? (:testset-name options))
+        {:exit-message (missing-option-msg "create-and-populate-testset" "testset-name")}
+
+        :else
+        {:action "create-and-populate-testset" :options options})
 
       :else
       {:exit-message (usage summary)})))
