@@ -5,6 +5,8 @@ If the structure of the report changes (new tests added for example), you will n
 
 ## Usage
 
+### create-testset
+
 Create new testset from reports folder:
 
 ``` shell
@@ -38,6 +40,7 @@ java -jar practitest-firecracker-standaline.jar \
 
 Replace the field ids with the actual IDs, you can see all your custom fields by calling this API call: [get-all-custom-fields-in-your-project](https://www.practitest.com/api-v2/#get-all-custom-fields-in-your-project)
 
+### populate-testset
 Populate the testset from reports folder:
 
 ``` shell
@@ -49,6 +52,26 @@ java -jar practitest-firecracker-standaline.jar \
     --testset-id=PRACTITEST_TESTSET_ID \
     populate-testset
 ```
+
+### create-and-populate-testset
+
+This will attempt to do the two actions above at once. It will search for TestSet with the given name. If the TestSet doesn't exist, it will create one. If it does exist, but some tests are not part of the TestSet, it will add the missing tests. And then it will populate the TestSet. Will print the TestSet ID (or error) when done.
+
+Example:
+
+``` shell
+java -jar practitest-firecracker-standaline.jar \
+    --api-token=YOUR_API_TOKEN \
+    --email=YOUR_EMAIL \
+    --reports-path=SUREFIRE_REPORTS_PATH \
+    --project-id=PRACTITEST_PROJECT_ID \
+    --testset-name="TestSet name" \
+    --author-id=PRACTITEST_USER_ID \
+    --additional-test-fields '{"custom-fields": {"---f-123": "foo", "---f-124": "bar"}}' \
+    --additional-testset-fields '{"custom-fields": {"---f-125": "baz"}}' \
+    create-and-populate-testset
+```
+
 
 ## License
 
