@@ -233,7 +233,8 @@
           (doseq [t new-tests]
             (ll-create-instance client project-id (:id testset) (:id t)))))
       ;; add any missing instances to the testset
-      (doseq [test-id (difference (set (map #(read-string (:id (last %))) tests))
+      (println tests)
+      (doseq [test-id (difference (set (map #(read-string (:id (last %))) (remove #(nil? (last %)) tests)))
                                   (set (map #(get-in % [:attributes :test-id]) instances)))]
         (ll-create-instance client project-id (:id testset) test-id))
       testset)
