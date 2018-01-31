@@ -237,4 +237,4 @@
                                   (set (map #(get-in % [:attributes :test-id]) instances)))]
         (ll-create-instance client project-id (:id testset) test-id))
       testset)
-    (create-sf-test client project-id author-id additional-test-fields sf-name additional-testset-fields sf-test-suites)))
+    (create-sf-testset client project-id author-id additional-test-fields sf-name additional-testset-fields sf-test-suites)))

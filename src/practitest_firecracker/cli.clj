@@ -99,4 +99,4 @@
         {:action "create-and-populate-testset" :options options})
 
       :else
-      {:exit-message (usage summary)})))
+      {:exit-message (format "\nUnsupported action [%s]\n\n%s" (first arguments) (usage summary))})))

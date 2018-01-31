@@ -11,7 +11,6 @@
 
 (defn -main [& args]
   (let [{:keys [action options exit-message ok?]} (parse-args args)]
-    (println action options)
     (if exit-message
       (exit (if ok? 0 1) exit-message)
       (let [client  (make-client (select-keys options [:email :api-token :api-uri]))
