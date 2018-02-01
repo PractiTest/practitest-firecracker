@@ -55,6 +55,6 @@
 ;; ===========================================================================
 ;; API
 
-(defn parse-reports-dir [path]
-  (let [parser (SurefireReportParser. [(file path)] (Locale/getDefault) (console-logger))]
+(defn parse-reports-dir [paths]
+  (let [parser (SurefireReportParser. (map file paths) (Locale/getDefault) (console-logger))]
     (map translate-test-suite (.parseXMLReportFiles parser))))

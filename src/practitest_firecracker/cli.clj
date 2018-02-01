@@ -9,8 +9,11 @@
   [[nil "--api-uri URI" "API URI" :default "https://api.practitest.com"]
    [nil "--api-token TOKEN" "API token"]
    [nil "--email EMAIL" "Your email address"]
-   [nil "--reports-path PATH" "Path to surefire reports directory"
-    :validate [#(.exists (file %)) "Directory doesn't exist"]]
+   [nil "--reports-path PATH"
+    "Path to surefire reports directory. Can be provided multiple times to specify multiple directories."
+    :validate [#(.exists (file %)) "Directory doesn't exist"]
+    :assoc-fn (fn [m k v]
+                (update m k conj v))]
    [nil "--project-id PROJECT-ID" "PractiTest Project ID"
     :parse-fn #(Integer/parseInt %)]
    [nil "--testset-name TESTSET-NAME" "PractiTest TestSet name"]
