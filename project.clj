@@ -1,6 +1,6 @@
-(defproject practitest-firecracker "0.3.3"
-  :description "FIXME: write description"
-  :url "http://example.com/FIXME"
+(defproject practitest-firecracker "0.3.4"
+  :description "CLI to parse and upload surefire reports to PractiTest as TestSet"
+  :url "https://github.com/PractiTest/practitest-firecracker"
 
   :license {:name "Eclipse Public License"
             :url  "http://www.eclipse.org/legal/epl-v10.html"}

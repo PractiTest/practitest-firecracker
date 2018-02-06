@@ -10,10 +10,13 @@
    [nil "--api-token TOKEN" "API token"]
    [nil "--email EMAIL" "Your email address"]
    [nil "--reports-path PATH"
-    "Path to surefire reports directory. Can be provided multiple times to specify multiple directories."
-    :validate [#(.exists (file %)) "Directory doesn't exist"]
+    "Path to surefire reports directory. Can be provided multiple times to specify multiple directories. You can also provide multiple directories separated by comma in the same --reports-path option"
+    :parse-fn #(string/split % #"\s*,\s*")
+    :validate [(fn [paths]
+                 (every? #(.exists (file %)) paths))
+               "Directory doesn't exist"]
     :assoc-fn (fn [m k v]
-                (update m k conj v))]
+                (reduce #(update %1 k conj %2) m v))]
    [nil "--project-id PROJECT-ID" "PractiTest Project ID"
     :parse-fn #(Integer/parseInt %)]
    [nil "--testset-name TESTSET-NAME" "PractiTest TestSet name"]
