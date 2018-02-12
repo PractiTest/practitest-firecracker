@@ -7,17 +7,39 @@
 ;; ===========================================================================
 ;; utils
 
+(def backoff-timeout 30000)
+
 (defn build-uri [base-uri resource-uri-template & params]
   (apply format (str base-uri resource-uri-template) params))
 
 (defn api-call [{:keys [credentials uri method query-params form-params]}]
   (assert (not (and query-params form-params))
           "both `query-params` and `form-params` can't be specified")
-  (-> (method uri (cond-> {:basic-auth credentials :as :json}
-                    query-params (assoc :query-params query-params)
-                    form-params  (assoc :form-params form-params :content-type :json)))
-      :body
-      :data))
+  (loop [results []
+         uri     uri
+         params  (cond-> {:basic-auth credentials
+                          :throw-exceptions false
+                          :as :json}
+                   query-params (assoc :query-params query-params)
+                   form-params  (assoc :form-params form-params :content-type :json))]
+    (if (nil? uri)
+      results
+      (let [{:keys [status body]} (method uri params)]
+        (case status
+          429 (do
+                (println (format "API rate limit reached, waiting for %s seconds" backoff-timeout))
+                (Thread/sleep (* backoff-timeout 1000))
+                (recur results uri params))
+          200 (let [data (:data body)]
+                (recur (vec
+                        (if (sequential? data)
+                          (concat results data)
+                          (conj results data)))
+                       (get-in body [:links :next])
+                       (dissoc params :query-params)))
+          (throw (ex-info "API request failed" {:status status
+                                                :body   body
+                                                :uri    uri})))))))
 
 ;; ===========================================================================
 ;; constants
@@ -44,12 +66,12 @@
 
 (defn ll-testset [{:keys [base-uri credentials]} project-id id]
   (let [uri (build-uri base-uri testset-uri project-id id)]
-    (api-call {:credentials credentials
-               :uri         uri
-               :method      http/get})))
+    (first
+     (api-call {:credentials credentials
+                :uri         uri
+                :method      http/get}))))
 
 (defn ll-testset-instances [{:keys [base-uri credentials]} project-id testset-id]
-  ;; TODO: support testsets with more than 100 instances (currently returns only first 100)
   (let [uri (build-uri base-uri testset-instances-uri project-id)]
     (api-call {:credentials  credentials
                :uri          uri
@@ -58,9 +80,10 @@
 
 (defn ll-test [{:keys [base-uri credentials]} project-id id]
   (let [uri (build-uri base-uri test-uri project-id id)]
-    (api-call {:credentials credentials
-               :uri         uri
-               :method      http/get})))
+    (first
+     (api-call {:credentials credentials
+                :uri         uri
+                :method      http/get}))))
 
 (defn ll-test-steps [{:keys [base-uri credentials]} project-id test-id]
   (let [uri (build-uri base-uri test-steps-uri project-id)]
@@ -71,39 +94,43 @@
 
 (defn ll-create-test [{:keys [base-uri credentials]} project-id attributes steps]
   (let [uri (build-uri base-uri create-test-uri project-id)]
-    (api-call {:credentials credentials
-               :uri         uri
-               :method      http/post
-               :form-params {:data {:type       "tests"
-                                    :attributes attributes
-                                    :steps      {:data steps}}}})))
+    (first
+     (api-call {:credentials credentials
+                :uri         uri
+                :method      http/post
+                :form-params {:data {:type       "tests"
+                                     :attributes attributes
+                                     :steps      {:data steps}}}}))))
 
 (defn ll-create-testset [{:keys [base-uri credentials]} project-id attributes test-ids]
   (let [uri (build-uri base-uri create-testset-uri project-id)]
-    (api-call {:credentials credentials
-               :uri         uri
-               :method      http/post
-               :form-params {:data {:type       "sets"
-                                    :attributes attributes
-                                    :instances  {:test-ids test-ids}}}})))
+    (first
+     (api-call {:credentials credentials
+                :uri         uri
+                :method      http/post
+                :form-params {:data {:type       "sets"
+                                     :attributes attributes
+                                     :instances  {:test-ids test-ids}}}}))))
 
 (defn ll-create-instance [{:keys [base-uri credentials]} project-id testset-id test-id]
   (let [uri (build-uri base-uri create-instance-uri project-id)]
-    (api-call {:credentials credentials
-               :uri         uri
-               :method      http/post
-               :form-params {:data {:type       "instances"
-                                    :attributes {:set-id  testset-id
-                                                 :test-id test-id}}}})))
+    (first
+     (api-call {:credentials credentials
+                :uri         uri
+                :method      http/post
+                :form-params {:data {:type       "instances"
+                                     :attributes {:set-id  testset-id
+                                                  :test-id test-id}}}}))))
 
 (defn ll-create-run [{:keys [base-uri credentials]} project-id instance-id attributes steps]
   (let [uri (build-uri base-uri create-run-uri project-id)]
-    (api-call {:credentials credentials
-               :uri         uri
-               :method      http/post
-               :form-params {:data {:type       "instances"
-                                    :attributes (assoc attributes :instance-id instance-id)
-                                    :steps      {:data steps}}}})))
+    (first
+     (api-call {:credentials credentials
+                :uri         uri
+                :method      http/post
+                :form-params {:data {:type       "instances"
+                                     :attributes (assoc attributes :instance-id instance-id)
+                                     :steps      {:data steps}}}}))))
 
 (defn ll-find-test [{:keys [base-uri credentials]} project-id name]
   (let [uri (build-uri base-uri list-tests-uri project-id)]
@@ -200,9 +227,10 @@
       (throw (ex-info (format "some tests do not exist in PT: %s"
                               (string/join ", " (map first nil-tests)))
                       {})))
-    (when (seq (difference (set (map #(read-string (:id (last %))) tests))
-                           (set (map #(get-in % [:attributes :test-id]) instances))))
-      (throw (ex-info "some tests are not part of the given testset" {})))
+    (let [not-in-ts (difference (set (map #(read-string (:id (last %))) tests))
+                                (set (map #(get-in % [:attributes :test-id]) instances)))]
+      (when (seq not-in-ts)
+        (throw (ex-info "some tests are not part of the given testset" {:test-ids not-in-ts}))))
     true))
 
 (defn populate-sf-results [client project-id testset-id sf-test-suites]
