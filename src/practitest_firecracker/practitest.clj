@@ -7,7 +7,7 @@
 ;; ===========================================================================
 ;; utils
 
-(def backoff-timeout 30000)
+(def backoff-timeout "Backoff timeout in seconds" 30)
 
 (defn build-uri [base-uri resource-uri-template & params]
   (apply format (str base-uri resource-uri-template) params))
