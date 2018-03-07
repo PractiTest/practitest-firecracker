@@ -26,8 +26,13 @@
       results
       (let [{:keys [status body]} (method uri params)]
         (case status
+          504 (do
+                ;; load balancer freaking out, lets try again
+                (Thread/sleep 1000)
+                (recur results uri params))
           429 (do
-                (println (format "API rate limit reached, waiting for %s seconds" backoff-timeout))
+                (binding [*out* *err*]
+                  (println (format "API rate limit reached, waiting for %s seconds" backoff-timeout)))
                 (Thread/sleep (* backoff-timeout 1000))
                 (recur results uri params))
           200 (let [data (:data body)]
@@ -201,7 +206,7 @@
       (ll-create-test client project-id (merge test-def {:author-id author-id} additional-fields) step-defs))))
 
 (defn create-sf-testset [client project-id author-id additional-test-fields sf-name additional-testset-fields sf-test-suites]
-  (let [tests (map (partial create-sf-test client project-id author-id additional-test-fields) sf-test-suites)]
+  (let [tests (pmap (partial create-sf-test client project-id author-id additional-test-fields) sf-test-suites)]
     (ll-create-testset client project-id (merge {:name sf-name} additional-testset-fields) (map :id tests))))
 
 (defn sf-test-case->run-step-def [test-case]
@@ -234,13 +239,18 @@
     true))
 
 (defn populate-sf-results [client project-id testset-id sf-test-suites]
+  (binding [*out* *err*]
+    (println (str "populating testset " testset-id " with results from " (count sf-test-suites) " suites")))
   (when (validate-testset client project-id testset-id sf-test-suites)
-    (doseq [sf-test-suite sf-test-suites
-            :let [test-name (str (:package-name sf-test-suite) ":" (:name sf-test-suite))
-                  test      (ll-find-test client project-id test-name)
-                  instance  (ll-find-instance client project-id testset-id (:id test))
-                  [run run-steps] (sf-test-suite->run-def sf-test-suite)]]
-      (ll-create-run client project-id (:id instance) run run-steps))))
+    (doall
+     (pmap (fn [sf-test-suite]
+             (let [test-name       (str (:package-name sf-test-suite) ":" (:name sf-test-suite))
+                   test            (ll-find-test client project-id test-name)
+                   instance        (ll-find-instance client project-id testset-id (:id test))
+                   [run run-steps] (sf-test-suite->run-def sf-test-suite)]
+               (ll-create-run client project-id (:id instance) run run-steps)))
+           sf-test-suites))
+    true))
 
 (defn find-sf-testset [client project-id testset-name]
   (ll-find-testset client project-id testset-name))
@@ -249,15 +259,15 @@
   ;; find the testset
   (if-let [testset (find-sf-testset client project-id sf-name)]
     (let [instances (ll-testset-instances client project-id (:id testset))
-          tests     (map (fn [test-suite]
-                           (let [name (str (:package-name test-suite) ":" (:name test-suite))]
-                             [name test-suite (ll-find-test client project-id name)]))
-                         sf-test-suites)
+          tests     (pmap (fn [test-suite]
+                            (let [name (str (:package-name test-suite) ":" (:name test-suite))]
+                              [name test-suite (ll-find-test client project-id name)]))
+                          sf-test-suites)
           nil-tests (filter #(nil? (last %)) tests)]
       (when (seq nil-tests)
         ;; create missing tests add add them to the testset
-        (let [new-tests (map (partial create-sf-test client project-id author-id additional-test-fields)
-                             (map second nil-tests))]
+        (let [new-tests (pmap (partial create-sf-test client project-id author-id additional-test-fields)
+                              (map second nil-tests))]
           (doseq [t new-tests]
             (ll-create-instance client project-id (:id testset) (:id t)))))
       ;; add any missing instances to the testset

@@ -9,6 +9,14 @@
   (println msg)
   (System/exit status))
 
+(defmacro timef
+  [module expr]
+  `(let [start# (. System (nanoTime))
+         ret# ~expr]
+     (binding [*out* *err*]
+       (println (str ~module " elapsed time: " (/ (double (- (. System (nanoTime)) start#)) 1000000.0) " msecs")))
+     ret#))
+
 (defn -main [& args]
   (let [{:keys [action options exit-message ok?]} (parse-args args)]
     (if exit-message
@@ -35,15 +43,19 @@
             (exit 0 "Done"))
 
           "create-and-populate-testset"
-          (let [testset (create-or-update-sf-testset client
-                                                     (:project-id options)
-                                                     (:author-id options)
-                                                     (:additional-test-fields options)
-                                                     (:testset-name options)
-                                                     (:additional-testset-fields options)
-                                                     reports)]
-            (populate-sf-results client
-                                 (:project-id options)
-                                 (:id testset)
-                                 reports)
+          (let [testset (timef
+                         "create-or-update-testset"
+                         (create-or-update-sf-testset client
+                                                      (:project-id options)
+                                                      (:author-id options)
+                                                      (:additional-test-fields options)
+                                                      (:testset-name options)
+                                                      (:additional-testset-fields options)
+                                                      reports))]
+            (timef
+             "populate-results"
+             (populate-sf-results client
+                                  (:project-id options)
+                                  (:id testset)
+                                  reports))
             (exit 0 (format "Populated TestSet ID: %s" (:id testset)))))))))

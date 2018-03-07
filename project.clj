@@ -1,4 +1,4 @@
-(defproject practitest-firecracker "0.3.6"
+(defproject practitest-firecracker "0.3.8"
   :description "CLI to parse and upload surefire reports to PractiTest as TestSet"
   :url "https://github.com/PractiTest/practitest-firecracker"
 
