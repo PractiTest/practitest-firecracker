@@ -8,6 +8,7 @@
 ;; utils
 
 (def backoff-timeout "Backoff timeout in seconds" 20)
+(def run-batch-bucket-size 10)
 
 (defn build-uri [base-uri resource-uri-template & params]
   (apply format (str base-uri resource-uri-template) params))
@@ -137,7 +138,17 @@
                                      :attributes (assoc attributes :instance-id instance-id)
                                      :steps      {:data steps}}}}))))
 
-(defn ll-find-test [{:keys [base-uri credentials]} project-id name]
+(defn ll-create-runs [{:keys [base-uri credentials]} project-id runs]
+  (let [uri (build-uri base-uri create-run-uri project-id)]
+    (api-call {:credentials credentials
+               :uri         uri
+               :method      http/post
+               :form-params {:data (for [[instance-id attributes steps] runs]
+                                     {:type       "instances"
+                                      :attributes (assoc attributes :instance-id instance-id)
+                                      :steps      {:data steps}})}})))
+
+(defn ll-find-test* [{:keys [base-uri credentials]} project-id name]
   (let [uri (build-uri base-uri list-tests-uri project-id)]
     ;; in case there are more than one test with this name, return the first one
     (first
@@ -146,7 +157,9 @@
                 :method       http/get
                 :query-params {:name_exact name}}))))
 
-(defn ll-find-instance [{:keys [base-uri credentials]} project-id testset-id test-id]
+(def ll-find-test (memoize ll-find-test*))
+
+(defn ll-find-instance* [{:keys [base-uri credentials]} project-id testset-id test-id]
   (let [uri (build-uri base-uri testset-instances-uri project-id)]
     (first
      (api-call {:credentials  credentials
@@ -155,13 +168,17 @@
                 :query-params {:set-ids  testset-id
                                :test-ids test-id}}))))
 
-(defn ll-find-testset [{:keys [base-uri credentials]} project-id name]
+(def ll-find-instance (memoize ll-find-instance*))
+
+(defn ll-find-testset* [{:keys [base-uri credentials]} project-id name]
   (let [uri (build-uri base-uri list-testsets-uri project-id)]
     (first
      (api-call {:credentials  credentials
                 :uri          uri
                 :method       http/get
                 :query-params {:name_exact name}}))))
+
+(def ll-find-testset (memoize ll-find-testset*))
 
 (defn testset [client project-id id]
   (let [testset   (ll-testset client project-id id)
@@ -223,10 +240,10 @@
   ;; if not -- throw exception, the user will need to create another testset
   ;; otherwise -- go on
   (let [instances (ll-testset-instances client project-id testset-id)
-        tests     (map (fn [test-suite]
-                         (let [name (str (:package-name test-suite) ":" (:name test-suite))]
-                           [name (ll-find-test client project-id name)]))
-                       sf-test-suites)
+        tests     (pmap (fn [test-suite]
+                          (let [name (str (:package-name test-suite) ":" (:name test-suite))]
+                            [name (ll-find-test client project-id name)]))
+                        sf-test-suites)
         nil-tests (filter #(nil? (last %)) tests)]
     (when (seq nil-tests)
       (throw (ex-info (format "some tests do not exist in PT: %s"
