@@ -1,4 +1,4 @@
-(defproject practitest-firecracker "0.3.9"
+(defproject practitest-firecracker "0.4.0"
   :description "CLI to parse and upload surefire reports to PractiTest as TestSet"
   :url "https://github.com/PractiTest/practitest-firecracker"
 
@@ -8,8 +8,8 @@
   :dependencies [[org.clojure/clojure                              "1.9.0"]
                  [org.clojure/tools.cli                            "0.3.5"]
                  [cheshire                                         "5.8.0"]
-                 [clj-http                                         "3.7.0"]
-                 [org.apache.maven.surefire/surefire-report-parser "2.20.1"]]
+                 [clj-http                                         "3.8.0"]
+                 [org.apache.maven.surefire/surefire-report-parser "2.21.0"]]
 
   :main ^:skip-aot practitest-firecracker.core
   :target-path "target/%s"
