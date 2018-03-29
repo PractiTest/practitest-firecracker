@@ -1,9 +1,15 @@
 (ns practitest-firecracker.cli
   (:require
-   [clojure.tools.cli :refer [parse-opts]]
-   [clojure.java.io   :refer [file]]
-   [clojure.string    :as string]
-   [cheshire.core     :as json]))
+   [clojure.tools.cli                :refer [parse-opts]]
+   [clojure.java.io                  :refer [file]]
+   [clojure.walk                     :refer [postwalk]]
+   [clojure.string                   :as string]
+   [cheshire.core                    :as json]
+   [practitest-firecracker.query-dsl :refer [read-query]]))
+
+(defn parse-additional-fields [v]
+  (postwalk #(if (string? %) (read-query %) %)
+            (json/parse-string v true)))
 
 (def cli-options
   [[nil "--api-uri URI" "API URI" :default "https://api.practitest.com"]
@@ -26,11 +32,19 @@
    [nil "--additional-test-fields JSON"
     "JSON containing the fields that should be added when creating PractiTest Test"
     :default {}
-    :parse-fn #(json/parse-string % true)]
+    :parse-fn parse-additional-fields]
    [nil "--additional-testset-fields JSON"
     "JSON containing the fields that should be added when creating PractiTest TestSet"
     :default {}
-    :parse-fn #(json/parse-string % true)]
+    :parse-fn parse-additional-fields]
+   [nil "--test-case-as-pt-test" :default true]
+   [nil "--test-case-as-pt-test-step" :default false]
+   [nil "--pt-test-name"
+    :parse-fn read-query
+    :default (read-query "(concat (join (capitalize (drop 2 (tokenize-package ?package-name)))) \": \" (join (capitalize (drop-last (tokenize-class-name ?test-suite-name)))))")]
+   [nil "--pt-test-step-name"
+    :parse-fn read-query
+    :default (read-query "(join (capitalize (tokenize-class-name ?test-case-name)))")]
    ["-h" "--help"]])
 
 (defn usage [options-summary]

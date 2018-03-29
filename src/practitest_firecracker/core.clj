@@ -1,7 +1,11 @@
 (ns practitest-firecracker.core
   (:require
    [practitest-firecracker.cli        :refer [parse-args]]
-   [practitest-firecracker.practitest :refer [make-client create-sf-testset populate-sf-results create-or-update-sf-testset]]
+   [practitest-firecracker.practitest :refer [make-client
+                                              create-sf-testset
+                                              populate-sf-results-old
+                                              populate-sf-results
+                                              create-or-update-sf-testset]]
    [practitest-firecracker.surefire   :refer [parse-reports-dir]])
   (:gen-class))
 
@@ -36,26 +40,21 @@
 
           "populate-testset"
           (do
-            (populate-sf-results client
-                                 (:project-id options)
-                                 (:testset-id options)
-                                 reports)
+            (populate-sf-results-old client
+                                     (:project-id options)
+                                     (:testset-id options)
+                                     reports)
             (exit 0 "Done"))
 
           "create-and-populate-testset"
           (let [testset (timef
                          "create-or-update-testset"
-                         (create-or-update-sf-testset client
-                                                      (:project-id options)
-                                                      (:author-id options)
-                                                      (:additional-test-fields options)
-                                                      (:testset-name options)
-                                                      (:additional-testset-fields options)
-                                                      reports))]
+                         (create-or-update-sf-testset client options reports))]
             (timef
              "populate-results"
              (populate-sf-results client
-                                  (:project-id options)
-                                  (:id testset)
+                                  (assoc options
+                                         :skip-validation? true
+                                         :testset-id       (:id testset))
                                   reports))
             (exit 0 (format "Populated TestSet ID: %s" (:id testset)))))))))
