@@ -29,13 +29,19 @@
     (^void error [_ ^String message ^Throwable cause]
      (println "console-logger:ERROR: " message ": " (.getMessage cause)))))
 
+(defn has-failure? [test-case]
+  ;; the parser is not always picking up that there was a failure
+  (boolean (or (.hasFailure test-case)
+               (.getFailureMessage test-case)
+               (.getFailureDetail test-case))))
+
 (defn translate-test-case [test-case]
   {:name            (.getName test-case)
    :full-name       (.getFullName test-case)
    :class-name      (.getClassName test-case)
    :full-class-name (.getFullClassName test-case)
    :time            (.getTime test-case)
-   :has-failure?    (.hasFailure test-case)
+   :has-failure?    (has-failure? test-case)
    :failure-type    (.getFailureType test-case)
    :failure-message (.getFailureMessage test-case)
    :failure-detail  (.getFailureDetail test-case)})

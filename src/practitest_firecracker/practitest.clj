@@ -135,6 +135,7 @@
                                                   :test-id test-id}}}}))))
 
 (defn ll-create-run [{:keys [base-uri credentials]} project-id instance-id attributes steps]
+  (println :ll-create-run project-id instance-id)
   (let [uri (build-uri base-uri create-run-uri project-id)]
     (first
      (api-call {:credentials credentials
@@ -145,6 +146,7 @@
                                      :steps      {:data steps}}}}))))
 
 (defn ll-create-runs [{:keys [base-uri credentials]} project-id runs]
+  (println :ll-create-runs project-id (map first runs))
   (let [uri (build-uri base-uri create-run-uri project-id)]
     (api-call {:credentials credentials
                :uri         uri
@@ -235,10 +237,12 @@
             additional-fields))
 
 (defn sf-test-suite->pt-test-name [options suite]
-  (eval-query suite {} (:pt-test-name options)))
+  (let [test-name (eval-query suite {} (:pt-test-name options))]
+    (if (string/blank? test-name) "UNNAMED" test-name)))
 
 (defn sf-test-case->pt-step-name [options test-case]
-  (eval-query {} test-case (:pt-test-step-name options)))
+  (let [step-name (eval-query {} test-case (:pt-test-step-name options))]
+    (if (string/blank? step-name) "UNNAMED" step-name)))
 
 (defn sf-test-case->step-def-old [test-case]
   {:name (:full-name test-case)})
@@ -303,7 +307,7 @@
 
 (defn sf-test-case->run-step-def-old [test-case]
   {:name           (:full-name test-case)
-   :actual-results (:failure-message test-case)
+   :actual-results (str (:failure-message test-case) \newline (:failure-detail test-case))
    :status         (if (:has-failure? test-case) "FAILED" "PASSED")})
 
 (defn sf-test-suite->run-def-old [test-suite]
@@ -346,7 +350,7 @@
 
 (defn sf-test-case->run-step-def [options test-case]
   {:name           (sf-test-case->pt-step-name options test-case)
-   :actual-results (:failure-message test-case)
+   :actual-results (str (:failure-message test-case) \newline (:failure-detail test-case))
    :status         (if (:has-failure? test-case) "FAILED" "PASSED")})
 
 (defn sf-test-suite->run-def [options test-suite]

@@ -5,11 +5,11 @@
   :license {:name "Eclipse Public License"
             :url  "http://www.eclipse.org/legal/epl-v10.html"}
 
-  :dependencies [[org.clojure/clojure                              "1.9.0"]
-                 [org.clojure/tools.cli                            "0.3.5"]
-                 [cheshire                                         "5.8.0"]
-                 [clj-http                                         "3.8.0"]
-                 [org.apache.maven.surefire/surefire-report-parser "2.21.0"]]
+  :dependencies [[org.clojure/clojure                              "1.10.0"]
+                 [org.clojure/tools.cli                            "0.4.2"]
+                 [cheshire                                         "5.8.1"]
+                 [clj-http                                         "3.10.0"]
+                 [org.apache.maven.surefire/surefire-report-parser "2.22.2"]]
 
   :main ^:skip-aot practitest-firecracker.core
   :target-path "target/%s"

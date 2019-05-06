@@ -29,13 +29,7 @@
             reports (parse-reports-dir (:reports-path options))]
         (case action
           "create-testset"
-          (let [testset (create-sf-testset client
-                                           (:project-id options)
-                                           (:author-id options)
-                                           (:additional-test-fields options)
-                                           (:testset-name options)
-                                           (:additional-testset-fields options)
-                                           reports)]
+          (let [testset (create-or-update-sf-testset client options reports)]
             (exit 0 (format "TestSet ID: %s" (:id testset))))
 
           "populate-testset"
