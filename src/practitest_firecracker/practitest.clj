@@ -375,28 +375,6 @@
 (defn find-sf-testset [client project-id testset-name]
   (ll-find-testset client project-id testset-name))
 
-(defn create-or-update-sf-testset-old [client project-id author-id additional-test-fields sf-name additional-testset-fields sf-test-suites]
-  ;; find the testset
-  (if-let [testset (find-sf-testset client project-id sf-name)]
-    (let [instances (ll-testset-instances client project-id (:id testset))
-          tests     (pmap (fn [test-suite]
-                            (let [name (str (:package-name test-suite) ":" (:name test-suite))]
-                              [name test-suite (ll-find-test client project-id name)]))
-                          sf-test-suites)
-          nil-tests (filter #(nil? (last %)) tests)]
-      (when (seq nil-tests)
-        ;; create missing tests add add them to the testset
-        (let [new-tests (pmap (partial create-sf-test client project-id author-id additional-test-fields)
-                              (map second nil-tests))]
-          (doseq [t new-tests]
-            (ll-create-instance client project-id (:id testset) (:id t)))))
-      ;; add any missing instances to the testset
-      (doseq [test-id (difference (set (map #(read-string (:id (last %))) (remove #(nil? (last %)) tests)))
-                                  (set (map #(get-in % [:attributes :test-id]) instances)))]
-        (ll-create-instance client project-id (:id testset) test-id))
-      testset)
-    (create-sf-testset client project-id author-id additional-test-fields sf-name additional-testset-fields sf-test-suites)))
-
 (defn create-or-update-sf-testset [client {:keys [project-id] :as options} sf-test-suites]
   (if-let [testset (find-sf-testset client project-id (:testset-name options))]
     (let [instances (ll-testset-instances client project-id (:id testset))
