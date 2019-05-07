@@ -39,12 +39,18 @@
     :parse-fn parse-additional-fields]
    [nil "--test-case-as-pt-test" :default true]
    [nil "--test-case-as-pt-test-step" :default false]
-   [nil "--pt-test-name DSL"
+   #_[nil "--pt-test-name DSL"
     :parse-fn read-query
     :default (read-query "(concat (join (capitalize (drop 2 (tokenize-package ?package-name)))) \": \" (join (capitalize (drop-last (tokenize-class-name ?test-suite-name)))))")]
-   [nil "--pt-test-step-name DSL"
+   [nil "--pt-test-name DSL"
+    :parse-fn read-query
+    :default (read-query "?test-suite-name")]
+   #_[nil "--pt-test-step-name DSL"
     :parse-fn read-query
     :default (read-query "(join (capitalize (tokenize-class-name ?test-case-name)))")]
+   [nil "--pt-test-step-name DSL"
+    :parse-fn read-query
+    :default (read-query "?test-case-name")]
    ["-h" "--help"]])
 
 (defn usage [options-summary]

@@ -4,6 +4,7 @@
    [clojure.set                      :refer [difference]]
    [clojure.walk                     :refer [postwalk]]
    [clj-http.client                  :as http]
+   [clojure.tools.logging            :as log]
    [practitest-firecracker.query-dsl :refer [query? eval-query]]))
 
 ;; ===========================================================================
@@ -36,8 +37,7 @@
                 (Thread/sleep 1000)
                 (recur results uri params))
           429 (do
-                (binding [*out* *err*]
-                  (println (format "API rate limit reached, waiting for %s seconds" backoff-timeout)))
+                (log/warnf "API rate limit reached, waiting for %s seconds" backoff-timeout)
                 (Thread/sleep (* backoff-timeout 1000))
                 (recur results uri params))
           200 (let [data (:data body)]
@@ -135,7 +135,7 @@
                                                   :test-id test-id}}}}))))
 
 (defn ll-create-run [{:keys [base-uri credentials]} project-id instance-id attributes steps]
-  (println :ll-create-run project-id instance-id)
+  (log/info :ll-create-run project-id instance-id)
   (let [uri (build-uri base-uri create-run-uri project-id)]
     (first
      (api-call {:credentials credentials
@@ -146,7 +146,7 @@
                                      :steps      {:data steps}}}}))))
 
 (defn ll-create-runs [{:keys [base-uri credentials]} project-id runs]
-  (println :ll-create-runs project-id (map first runs))
+  (log/info :ll-create-runs project-id (map first runs))
   (let [uri (build-uri base-uri create-run-uri project-id)]
     (api-call {:credentials credentials
                :uri         uri
@@ -335,8 +335,7 @@
     true))
 
 (defn populate-sf-results-old [client project-id testset-id sf-test-suites]
-  (binding [*out* *err*]
-    (println (str "populating testset " testset-id " with results from " (count sf-test-suites) " suites")))
+  (log/infof "populating testset %s with results from %d suites" testset-id (count sf-test-suites))
   (when (validate-testset client project-id testset-id sf-test-suites)
     (doall
      (pmap (fn [sf-test-suite]
@@ -358,8 +357,7 @@
    (map (partial sf-test-case->run-step-def options) (:test-cases test-suite))])
 
 (defn populate-sf-results [client {:keys [project-id testset-id] :as options} sf-test-suites]
-  (binding [*out* *err*]
-    (println (str "populating testset " testset-id " with results from " (count sf-test-suites) " suites")))
+  (log/infof "populating testset %s with results from %d suites" testset-id (count sf-test-suites))
   (when (or (:skip-validation? options)
             (validate-testset client project-id testset-id sf-test-suites))
     (doall
@@ -368,6 +366,8 @@
                    test            (ll-find-test client project-id test-name)
                    instance        (ll-find-instance client project-id testset-id (:id test))
                    [run run-steps] (sf-test-suite->run-def options test-suite)]
+               (log/info (pr-str [testset-id (:id test)]))
+               (log/info (pr-str instance))
                (ll-create-run client project-id (:id instance) run run-steps)))
            sf-test-suites))
     true))

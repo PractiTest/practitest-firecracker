@@ -9,7 +9,9 @@
                  [org.clojure/tools.cli                            "0.4.2"]
                  [cheshire                                         "5.8.1"]
                  [clj-http                                         "3.10.0"]
-                 [org.apache.maven.surefire/surefire-report-parser "2.22.2"]]
+                 [org.apache.maven.surefire/surefire-report-parser "2.22.2"]
+                 [org.clojure/tools.logging                        "0.4.1"]
+                 [ch.qos.logback/logback-classic                   "1.2.3"]]
 
   :main ^:skip-aot practitest-firecracker.core
   :target-path "target/%s"

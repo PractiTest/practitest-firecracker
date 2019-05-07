@@ -1,6 +1,7 @@
 (ns practitest-firecracker.surefire
   (:require
-   [clojure.java.io :refer [file]])
+   [clojure.java.io       :refer [file]]
+   [clojure.tools.logging :as log])
   (:import
    (java.util Locale)
    (org.apache.maven.plugins.surefire.report SurefireReportParser)
@@ -17,17 +18,17 @@
   ;; all in all, it's a little more verbose than i like
   (reify ConsoleLogger
     (^void debug [_ ^String message]
-     (println "console-logger:DEBUG: " message))
+     (log/debug message))
     (^void info [_ ^String message]
-     (println "console-logger:INFO: " message))
+     (log/info message))
     (^void warning [_ ^String message]
-     (println "console-logger:WARNING: " message))
+     (log/warn message))
     (^void error [_ ^String message]
-     (println "console-logger:ERROR: " message))
+     (log/error message))
     (^void error [_ ^Throwable cause]
-     (println "console-logger:ERROR: " (.getMessage cause)))
+     (log/error cause))
     (^void error [_ ^String message ^Throwable cause]
-     (println "console-logger:ERROR: " message ": " (.getMessage cause)))))
+     (log/error cause message))))
 
 (defn has-failure? [test-case]
   ;; the parser is not always picking up that there was a failure
@@ -44,7 +45,8 @@
    :has-failure?    (has-failure? test-case)
    :failure-type    (.getFailureType test-case)
    :failure-message (.getFailureMessage test-case)
-   :failure-detail  (.getFailureDetail test-case)})
+   :failure-detail  (.getFailureDetail test-case)
+   :raw test-case})
 
 (defn translate-test-suite [test-suite]
   {:name            (.getName test-suite)
@@ -56,6 +58,7 @@
    :skipped         (.getNumberOfSkipped test-suite)
    :flakes          (.getNumberOfFlakes test-suite)
    :tests           (.getNumberOfTests test-suite)
+   :raw test-suite
    :test-cases      (map translate-test-case (.getTestCases test-suite))})
 
 ;; ===========================================================================
