@@ -76,7 +76,9 @@
                      "api/v2")})
 
 (defn ll-testset [{:keys [base-uri credentials]} project-id id]
-  (let [uri (build-uri base-uri testset-uri project-id id)]
+  (let [uri (build-uri base-uri testset-uri project-id (if (string? id)
+                                                         (Long/parseLong id)
+                                                         id))]
     (first
      (api-call {:credentials credentials
                 :uri         uri
@@ -154,7 +156,7 @@
                                       :attributes (assoc attributes :instance-id instance-id)
                                       :steps      {:data steps}})}})))
 
-(defn ll-find-test* [{:keys [base-uri credentials]} project-id name]
+(defn ll-find-test [{:keys [base-uri credentials]} project-id name]
   (let [uri (build-uri base-uri list-tests-uri project-id)]
     ;; in case there are more than one test with this name, return the first one
     (first
@@ -163,9 +165,7 @@
                 :method       http/get
                 :query-params {:name_exact name}}))))
 
-(def ll-find-test (memoize ll-find-test*))
-
-(defn ll-find-instance* [{:keys [base-uri credentials]} project-id testset-id test-id]
+(defn ll-find-instance [{:keys [base-uri credentials]} project-id testset-id test-id]
   (let [uri (build-uri base-uri testset-instances-uri project-id)]
     (first
      (api-call {:credentials  credentials
@@ -174,17 +174,13 @@
                 :query-params {:set-ids  testset-id
                                :test-ids test-id}}))))
 
-(def ll-find-instance (memoize ll-find-instance*))
-
-(defn ll-find-testset* [{:keys [base-uri credentials]} project-id name]
+(defn ll-find-testset [{:keys [base-uri credentials]} project-id name]
   (let [uri (build-uri base-uri list-testsets-uri project-id)]
     (first
      (api-call {:credentials  credentials
                 :uri          uri
                 :method       http/get
                 :query-params {:name_exact name}}))))
-
-(def ll-find-testset (memoize ll-find-testset*))
 
 (defn ll-get-custom-field [{:keys [base-uri credentials]} project-id cf-id]
   (let [uri (build-uri base-uri custom-field-uri project-id cf-id)]
@@ -300,7 +296,8 @@
   (let [tests (map (partial create-sf-test client options) sf-test-suites)]
     (ll-create-testset client
                        (:project-id options)
-                       (merge {:name (:testset-name options)} (:additional-testset-fields options))
+                       (merge {:name (:testset-name options)}
+                              (:additional-testset-fields options))
                        (map :id tests))))
 
 (defn sf-test-case->run-step-def-old [test-case]
