@@ -356,13 +356,13 @@
   (when (or (:skip-validation? options)
             (validate-testset client project-id testset-id sf-test-suites))
     (doall
-     (map (fn [test-suite]
-            (let [test-name       (sf-test-suite->pt-test-name options test-suite)
-                  test            (ll-find-test client project-id test-name)
-                  instance        (ll-find-instance client project-id testset-id (:id test))
-                  [run run-steps] (sf-test-suite->run-def options test-suite)]
-              (ll-create-run client project-id (:id instance) run run-steps)))
-          sf-test-suites))
+     (pmap (fn [test-suite]
+             (let [test-name       (sf-test-suite->pt-test-name options test-suite)
+                   test            (ll-find-test client project-id test-name)
+                   instance        (ll-find-instance client project-id testset-id (:id test))
+                   [run run-steps] (sf-test-suite->run-def options test-suite)]
+               (ll-create-run client project-id (:id instance) run run-steps)))
+           sf-test-suites))
     true))
 
 (defn find-sf-testset [client project-id testset-name]
@@ -372,21 +372,21 @@
   (let [testset (or (find-sf-testset client project-id (:testset-name options))
                     (create-sf-testset client options sf-test-suites))]
     (let [instances (ll-testset-instances client project-id (:id testset))
-          tests     (map (fn [test-suite]
-                           (let [test-name (sf-test-suite->pt-test-name options test-suite)]
-                             [test-name test-suite (ll-find-test client project-id test-name)]))
-                         sf-test-suites)
+          tests     (pmap (fn [test-suite]
+                            (let [test-name (sf-test-suite->pt-test-name options test-suite)]
+                              [test-name test-suite (ll-find-test client project-id test-name)]))
+                          sf-test-suites)
           nil-tests (filter #(nil? (last %)) tests)]
       (when (seq nil-tests)
         ;; create missing tests and add them to the testset
-        (let [new-tests (map (fn [[_ test-suite _]]
-                               (create-sf-test client options test-suite))
-                             nil-tests)]
+        (let [new-tests (pmap (fn [[_ test-suite _]]
+                                (create-sf-test client options test-suite))
+                              nil-tests)]
           (doall
-           (map #(ll-create-instance client project-id (:id testset) (:id %)) new-tests))))
+           (pmap #(ll-create-instance client project-id (:id testset) (:id %)) new-tests))))
       ;; add any missing instances to the testset
       (let [missing-tests (difference (set (map #(read-string (:id (last %))) (remove #(nil? (last %)) tests)))
                                       (set (map #(get-in % [:attributes :test-id]) instances)))]
         (doall
-         (map #(ll-create-instance client project-id (:id testset) %) missing-tests)))
+         (pmap #(ll-create-instance client project-id (:id testset) %) missing-tests)))
       testset)))
