@@ -17,6 +17,9 @@
                  tail)
           (recur (conj results head) tail))))))
 
+(defn parse-int [s]
+  (Integer. (re-find  #"\d+" s )))
+
 (defn eval-query [test-suite test-case query]
   (if (map? query)
     (let [{:keys [op args]} query
@@ -41,7 +44,7 @@
                                 (ex-info "Syntax error: 'take' must have two arguments"
                                          {:query query})))
         'drop                (if (= 2 (count args))
-                               (drop (first args) (last args))
+                               (drop (parse-int (first args)) (last args))
                                (throw
                                 (ex-info "Syntax error: 'drop' must have two arguments"
                                          {:query query})))
@@ -57,22 +60,53 @@
                                 (ex-info "Syntax error: 'capitalize' must have one argument"
                                          {:query query})))
         'join                (if (= 1 (count args))
-                               (string/join \space (first args))
+                               (string/join (first args))
                                (throw
                                 (ex-info "Syntax error: 'join' must have one argument"
                                          {:query query})))
         (throw
          (ex-info (format "Syntax error: unsupported function '%s'" op)
                   {:query query}))))
-    (cond
-      (= '?package-name query)              (:package-name test-suite)
-      (= '?test-suite-name query)           (:name test-suite)
-      (= '?test-case-name query)            (:name test-case)
-      (string/starts-with? (str query) "?") (throw
-                                             (ex-info (format "Syntax error: unsupported variable '%s'" query)
-                                                      {:query query}))
-      (number? query)                       query
-      :else                                 (str query))))
+
+    ;; (let [key (keyword (string/join (drop 1 (str query))))]
+    ;;   (cond
+    ;;     (and (not (= test-suite nil))
+    ;;          (contains? test-suite key))      (key test-suite)
+    ;;     (and (not (= test-case nil))
+    ;;          (contains? test-case key))       (key test-case)
+    ;;     (string/starts-with? (str query) "?") (throw
+    ;;                                            (ex-info (format "Syntax error: unsupported variable '%s'" query) {:query query :test-suite test-suite :test-case test-case :key key}))
+    ;;     (number? query)                       query
+    ;;     :else                                 (str query)))
+    (let [key (keyword (string/join (drop 1 (str query))))]
+      (cond
+        (= :test-suite-name key)              (:name test-suite)
+        (= :test-case-name key)               (:name test-case)
+        (and (not (= test-suite nil))
+             (contains? test-suite key))      (key test-suite)
+        (and (not (= test-case nil))
+             (contains? test-case key))       (key test-case)
+        (string/starts-with? (str query) "?") (throw
+                                               (ex-info (format "Syntax error: unsupported variable '%s'" query)
+                                                        {:query query}))
+        (number? query)                       (str query)
+        :else (str "else: " query " key: " key)
+        )
+      ;; (if (and (not (= test-suite nil)) (contains? test-suite key))
+      ;;   (key test-suite)
+      ;;   (if (and (not (= test-case nil)) (contains? test-case key))
+      ;;     (key test-case)
+      ;;     (str query)
+      ;;     )
+      ;;   )
+      )
+    ;; (cond
+    ;;   (= '?package-name query)              (:package-name test-suite)
+    ;;   (= '?test-suite-name query)           (:name test-suite)
+    ;;   (= '?test-case-name query)            (:name test-case)
+    ;;   (number? query)                       query
+    ;;   :else                                 (str query))
+    ))
 
 (defn read-query [s]
   (let [query    (edn/read-string s)

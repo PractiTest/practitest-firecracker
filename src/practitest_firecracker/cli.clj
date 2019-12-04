@@ -1,7 +1,7 @@
 (ns practitest-firecracker.cli
   (:require
    [clojure.tools.cli                :refer [parse-opts]]
-   [clojure.java.io                  :refer [file]]
+   [clojure.java.io                  :refer [file reader]]
    [clojure.walk                     :refer [postwalk]]
    [clojure.string                   :as string]
    [cheshire.core                    :as json]
@@ -20,6 +20,14 @@
     :parse-fn #(string/split % #"\s*,\s*")
     :validate [(fn [paths]
                  (every? #(.exists (file %)) paths))
+               "Directory doesn't exist"]
+    :assoc-fn (fn [m k v]
+                (reduce #(update %1 k conj %2) m v))]
+   [nil "--config-path PATH"
+    "Path to surefire cofiguration file"
+    :parse-fn #(string/split % #"\s*,\s*")
+    :validate [(fn [paths]
+                 #(.exists (file %)) paths)
                "Directory doesn't exist"]
     :assoc-fn (fn [m k v]
                 (reduce #(update %1 k conj %2) m v))]
@@ -77,52 +85,65 @@
   (format "%s is required for '%s' action" option-name action-name))
 
 (defn parse-args [args]
-  (let [{:keys [options arguments errors summary]} (parse-opts args cli-options)]
+  (let [{:keys [options arguments errors summary]} (parse-opts args cli-options)
+        config-content (with-open [rdr (reader (str (first (:config-path options))))]
+                         (reduce conj [] (line-seq rdr)))
+        parsed-json    (json/parse-string (first config-content) true)
+        new-additional-test-fields  (parse-additional-fields (json/generate-string (:additional-test-fields parsed-json)))
+        new-additional-testset-fields (parse-additional-fields (json/generate-string (:additional-testset-fields parsed-json)))
+        new-parsed-json    (merge parsed-json {:additional-test-fields new-additional-test-fields
+                                               :additional-testset-fields new-additional-testset-fields})
+        options2 (merge options new-parsed-json)]
     (cond
-      (:help options)
+      (:help options2)
       {:exit-message (usage summary) :ok? true}
 
       errors
       {:exit-message (error-msg errors)}
 
+      (= "test" (first arguments))
+      (cond
+        :else
+        {:exit-message (str options "\n\n\n\n\n" options2 "\n\n\n\n" new-additional-test-fields "\n\n\n\n" new-additional-testset-fields "\n\n\n\n\n\n" new-parsed-json)})
+
       (= "create-testset" (first arguments))
       (cond
-        (nil? (:project-id options))
+        (nil? (:project-id options2))
         {:exit-message (missing-option-msg "create-testset" "project-id")}
 
-        (nil? (:author-id options))
+        (nil? (:author-id options2))
         {:exit-message (missing-option-msg "create-testset" "author-id")}
 
-        (nil? (:testset-name options))
+        (nil? (:testset-name options2))
         {:exit-message (missing-option-msg "create-testset" "testset-name")}
 
         :else
-        {:action "create-testset" :options options})
+        {:action "create-testset" :options options2})
 
       (= "populate-testset" (first arguments))
       (cond
-        (nil? (:project-id options))
+        (nil? (:project-id options2))
         {:exit-message (missing-option-msg "populate-testset" "project-id")}
 
-        (nil? (:testset-id options))
+        (nil? (:testset-id options2))
         {:exit-message (missing-option-msg "populate-testset" "testset-id")}
 
         :else
-        {:action "populate-testset" :options options})
+        {:action "populate-testset" :options options2})
 
       (= "create-and-populate-testset" (first arguments))
       (cond
-        (nil? (:project-id options))
+        (nil? (:project-id options2))
         {:exit-message (missing-option-msg "create-and-populate-testset" "project-id")}
 
-        (nil? (:author-id options))
+        (nil? (:author-id options2))
         {:exit-message (missing-option-msg "create-and-populate-testset" "author-id")}
 
-        (nil? (:testset-name options))
+        (nil? (:testset-name options2))
         {:exit-message (missing-option-msg "create-and-populate-testset" "testset-name")}
 
         :else
-        {:action "create-and-populate-testset" :options options})
+        {:action "create-and-populate-testset" :options options2})
 
       :else
       {:exit-message (format "\nUnsupported action [%s]\n\n%s" (first arguments) (usage summary))})))

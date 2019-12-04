@@ -16,7 +16,6 @@
   :main ^:skip-aot practitest-firecracker.core
   :target-path "target/%s"
   :uberjar-name "practitest-firecracker-standalone.jar"
-
   :repl-options {:init-ns user
                  :init    (set! *print-length* 100)}
 
