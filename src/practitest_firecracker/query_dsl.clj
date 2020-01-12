@@ -68,16 +68,6 @@
          (ex-info (format "Syntax error: unsupported function '%s'" op)
                   {:query query}))))
 
-    ;; (let [key (keyword (string/join (drop 1 (str query))))]
-    ;;   (cond
-    ;;     (and (not (= test-suite nil))
-    ;;          (contains? test-suite key))      (key test-suite)
-    ;;     (and (not (= test-case nil))
-    ;;          (contains? test-case key))       (key test-case)
-    ;;     (string/starts-with? (str query) "?") (throw
-    ;;                                            (ex-info (format "Syntax error: unsupported variable '%s'" query) {:query query :test-suite test-suite :test-case test-case :key key}))
-    ;;     (number? query)                       query
-    ;;     :else                                 (str query)))
     (let [key (keyword (string/join (drop 1 (str query))))]
       (cond
         (= :test-suite-name key)              (:name test-suite)
@@ -88,25 +78,15 @@
              (contains? test-case key))       (key test-case)
         (string/starts-with? (str query) "?") (throw
                                                (ex-info (format "Syntax error: unsupported variable '%s'" query)
-                                                        {:query query}))
-        (number? query)                       (str query)
-        :else (str "else: " query " key: " key)
-        )
-      ;; (if (and (not (= test-suite nil)) (contains? test-suite key))
-      ;;   (key test-suite)
-      ;;   (if (and (not (= test-case nil)) (contains? test-case key))
-      ;;     (key test-case)
-      ;;     (str query)
-      ;;     )
-      ;;   )
-      )
-    ;; (cond
-    ;;   (= '?package-name query)              (:package-name test-suite)
-    ;;   (= '?test-suite-name query)           (:name test-suite)
-    ;;   (= '?test-case-name query)            (:name test-case)
-    ;;   (number? query)                       query
-    ;;   :else                                 (str query))
-    ))
+                                                        {:query query
+                                                         :key key
+                                                         :test-suite test-suite
+                                                         :test-case test-case}))
+        :else                                 (str query)
+        ;; (number? query)                       (str query)
+        ;; :else (str "else: " query " key: " key)
+        ;;:else (str "else: " query " key: " key)
+        ))))
 
 (defn read-query [s]
   (let [query    (edn/read-string s)

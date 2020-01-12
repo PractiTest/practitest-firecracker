@@ -62,6 +62,7 @@
 (def ^:const create-testset-uri "/projects/%d/sets.json")
 (def ^:const create-instance-uri "/projects/%d/instances.json")
 (def ^:const create-run-uri "/projects/%d/runs.json")
+(def ^:const update-test-uri "/projects/%d/tests/%d.json")
 (def ^:const list-tests-uri "/projects/%d/tests.json")
 (def ^:const list-testsets-uri "/projects/%d/sets.json")
 (def ^:const custom-field-uri "/projects/%d/custom_fields/%d.json")
@@ -198,6 +199,16 @@
                 :form-params {:data {:type       "custom_field"
                                      :attributes {:possible-values possible-values}}}}))))
 
+(defn ll-update-test [{:keys [base-uri credentials]} project-id attributes steps cf-id]
+  (let [uri (build-uri base-uri update-test-uri project-id cf-id)]
+    (first
+     (api-call {:credentials credentials
+                :uri         uri
+                :method      http/put
+                :form-params {:data {:type       "tests"
+                                     :attributes attributes
+                                     :steps      {:data steps}}}}))))
+
 (defn testset [client project-id id]
   (let [testset   (ll-testset client project-id id)
         instances (ll-testset-instances client project-id id)
@@ -227,6 +238,10 @@
                       tests)}))
 
 (defn eval-additional-fields [suite additional-fields]
+  (postwalk #(if (query? %) (eval-query suite {} %) %)
+            additional-fields))
+
+(defn eval-additional-testset-fields [suite additional-fields]
   (postwalk #(if (query? %) (eval-query suite {} %) %)
             additional-fields))
 
@@ -276,28 +291,47 @@
 
 (defn create-sf-test [client {:keys [project-id] :as options} sf-test-suite]
   (let [[test-def step-defs] (sf-test-suite->test-def options sf-test-suite)
-        test                 (ll-find-test client project-id (:name test-def))]
+        test                 (ll-find-test client project-id (:name test-def))
+        additional-test-fields (eval-additional-fields sf-test-suite (:additional-test-fields options))]
+    (ensure-custom-field-values client project-id (:custom-fields additional-test-fields))
     (if test
       test
-      (let [additional-test-fields (eval-additional-fields sf-test-suite (:additional-test-fields options))]
-        (ensure-custom-field-values client project-id (:custom-fields additional-test-fields))
-        (ll-create-test client
-                        project-id
-                        (merge test-def
-                               {:author-id (:author-id options)}
-                               additional-test-fields)
-                        step-defs)))))
+      (ll-create-test client
+                      project-id
+                      (merge test-def
+                             {:author-id (:author-id options)}
+                             additional-test-fields)
+                      step-defs))))
+
+(defn update-sf-test [client {:keys [project-id] :as options} sf-test-suite test-id]
+  (let [[test-def step-defs] (sf-test-suite->test-def options sf-test-suite)
+        additional-test-fields (eval-additional-fields sf-test-suite (:additional-test-fields options))]
+    (ensure-custom-field-values client project-id (:custom-fields additional-test-fields))
+    (ll-update-test client
+                    project-id
+                    (merge test-def
+                           {:author-id (:author-id options)}
+                           additional-test-fields)
+                    step-defs
+                    test-id)))
 
 (defn create-sf-testset-old [client project-id author-id additional-test-fields sf-name additional-testset-fields sf-test-suites]
   (let [tests (map (partial create-sf-test client project-id author-id additional-test-fields) sf-test-suites)]
     (ll-create-testset client project-id (merge {:name sf-name} additional-testset-fields) (map :id tests))))
 
 (defn create-sf-testset [client options sf-test-suites]
-  (let [tests (map (partial create-sf-test client options) sf-test-suites)]
+  (let [tests (map (partial create-sf-test client options) sf-test-suites)
+        ;; temp (throw (ex-info "API request failed"
+        ;;                      {;;:sf-test-suites (first (:test-cases (first sf-test-suites)))
+        ;;                       :sf-test-suites-full sf-test-suites}))
+        ;; additional-test-fields (eval-additional-testset-fields (first (:test-cases (first sf-test-suites))) (:additional-testset-fields options))
+        ]
     (ll-create-testset client
                        (:project-id options)
                        (merge {:name (:testset-name options)}
-                              (:additional-testset-fields options))
+                              ;; additional-test-fields
+                              (:additional-testset-fields options)
+                              )
                        (map :id tests))))
 
 (defn sf-test-case->run-step-def-old [test-case]
@@ -376,7 +410,8 @@
                             (let [test-name (sf-test-suite->pt-test-name options test-suite)]
                               [test-name test-suite (ll-find-test client project-id test-name)]))
                           sf-test-suites)
-          nil-tests (filter #(nil? (last %)) tests)]
+          nil-tests (filter #(nil? (last %)) tests)
+          old-tests (filter #(not (nil? (last %))) tests)]
       (when (seq nil-tests)
         ;; create missing tests and add them to the testset
         (let [new-tests (pmap (fn [[_ test-suite _]]
@@ -384,6 +419,11 @@
                               nil-tests)]
           (doall
            (pmap #(ll-create-instance client project-id (:id testset) (:id %)) new-tests))))
+      (when (seq old-tests)
+        ;; update existing tests with new values
+        (doall (map (fn [[_ test-suite test]]
+                      (update-sf-test client options test-suite (read-string (:id test))))
+                    old-tests)))
       ;; add any missing instances to the testset
       (let [missing-tests (difference (set (map #(read-string (:id (last %))) (remove #(nil? (last %)) tests)))
                                       (set (map #(get-in % [:attributes :test-id]) instances)))]

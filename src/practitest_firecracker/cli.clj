@@ -91,8 +91,9 @@
         parsed-json    (json/parse-string (first config-content) true)
         new-additional-test-fields  (parse-additional-fields (json/generate-string (:additional-test-fields parsed-json)))
         new-additional-testset-fields (parse-additional-fields (json/generate-string (:additional-testset-fields parsed-json)))
-        new-parsed-json    (merge parsed-json {:additional-test-fields new-additional-test-fields
-                                               :additional-testset-fields new-additional-testset-fields})
+        new-parsed-json    (merge parsed-json {:additional-testset-fields new-additional-testset-fields
+                                               :additional-test-fields new-additional-test-fields
+                                               })
         options2 (merge options new-parsed-json)]
     (cond
       (:help options2)
@@ -104,7 +105,7 @@
       (= "test" (first arguments))
       (cond
         :else
-        {:exit-message (str options "\n\n\n\n\n" options2 "\n\n\n\n" new-additional-test-fields "\n\n\n\n" new-additional-testset-fields "\n\n\n\n\n\n" new-parsed-json)})
+        {:exit-message (str options "\n\n" options2 "\n\n" new-additional-test-fields "\n\n" new-additional-testset-fields "\n\n" new-parsed-json)})
 
       (= "create-testset" (first arguments))
       (cond
