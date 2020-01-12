@@ -63,6 +63,7 @@
 (def ^:const create-instance-uri "/projects/%d/instances.json")
 (def ^:const create-run-uri "/projects/%d/runs.json")
 (def ^:const update-test-uri "/projects/%d/tests/%d.json")
+(def ^:const update-testset-uri "/projects/%d/sets/%d.json")
 (def ^:const list-tests-uri "/projects/%d/tests.json")
 (def ^:const list-testsets-uri "/projects/%d/sets.json")
 (def ^:const custom-field-uri "/projects/%d/custom_fields/%d.json")
@@ -209,6 +210,16 @@
                                      :attributes attributes
                                      :steps      {:data steps}}}}))))
 
+(defn ll-update-testset [{:keys [base-uri credentials]} project-id attributes steps cf-id]
+  (let [uri (build-uri base-uri update-testset-uri project-id cf-id)]
+    (first
+     (api-call {:credentials credentials
+                :uri         uri
+                :method      http/put
+                :form-params {:data {:type       "sets"
+                                     :attributes attributes
+                                     :steps      {:data steps}}}}))))
+
 (defn testset [client project-id id]
   (let [testset   (ll-testset client project-id id)
         instances (ll-testset-instances client project-id id)
@@ -315,23 +326,27 @@
                     step-defs
                     test-id)))
 
+(defn update-sf-testset [client {:keys [project-id] :as options} sf-test-suite testset-id]
+  (let [[test-def step-defs] (sf-test-suite->test-def options sf-test-suite)]
+    (ensure-custom-field-values client project-id (:custom-fields (:additional-testset-fields options)))
+    (ll-update-testset client
+                    project-id
+                    (merge test-def
+                           {:author-id (:author-id options)}
+                           (:additional-testset-fields options))
+                    step-defs
+                    testset-id)))
+
 (defn create-sf-testset-old [client project-id author-id additional-test-fields sf-name additional-testset-fields sf-test-suites]
   (let [tests (map (partial create-sf-test client project-id author-id additional-test-fields) sf-test-suites)]
     (ll-create-testset client project-id (merge {:name sf-name} additional-testset-fields) (map :id tests))))
 
 (defn create-sf-testset [client options sf-test-suites]
-  (let [tests (map (partial create-sf-test client options) sf-test-suites)
-        ;; temp (throw (ex-info "API request failed"
-        ;;                      {;;:sf-test-suites (first (:test-cases (first sf-test-suites)))
-        ;;                       :sf-test-suites-full sf-test-suites}))
-        ;; additional-test-fields (eval-additional-testset-fields (first (:test-cases (first sf-test-suites))) (:additional-testset-fields options))
-        ]
+  (let [tests (map (partial create-sf-test client options) sf-test-suites)]
     (ll-create-testset client
                        (:project-id options)
                        (merge {:name (:testset-name options)}
-                              ;; additional-test-fields
-                              (:additional-testset-fields options)
-                              )
+                              (:additional-testset-fields options))
                        (map :id tests))))
 
 (defn sf-test-case->run-step-def-old [test-case]
@@ -399,11 +414,13 @@
            sf-test-suites))
     true))
 
-(defn find-sf-testset [client project-id testset-name]
-  (ll-find-testset client project-id testset-name))
+(defn find-sf-testset [client project-id options]
+  (let [testset (ll-find-testset client project-id (:testset-name options))]
+    (when testset
+      (update-sf-testset client options testset (read-string (:id testset))))))
 
 (defn create-or-update-sf-testset [client {:keys [project-id] :as options} sf-test-suites]
-  (let [testset (or (find-sf-testset client project-id (:testset-name options))
+  (let [testset (or (find-sf-testset client project-id options)
                     (create-sf-testset client options sf-test-suites))]
     (let [instances (ll-testset-instances client project-id (:id testset))
           tests     (pmap (fn [test-suite]
