@@ -332,6 +332,7 @@
     (ll-update-testset client
                     project-id
                     (merge test-def
+                           {:name (:testset-name options)}
                            {:author-id (:author-id options)}
                            (:additional-testset-fields options))
                     step-defs

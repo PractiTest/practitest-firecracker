@@ -39,7 +39,7 @@
                                 (ex-info "Syntax error: 'tokenize-class-name' must have one argument"
                                          {:query query})))
         'take                (if (= 2 (count args))
-                               (take (first args) (last args))
+                               (take (parse-int (first args)) (last args))
                                (throw
                                 (ex-info "Syntax error: 'take' must have two arguments"
                                          {:query query})))
