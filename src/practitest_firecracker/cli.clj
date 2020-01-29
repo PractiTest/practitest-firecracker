@@ -24,7 +24,7 @@
     :assoc-fn (fn [m k v]
                 (reduce #(update %1 k conj %2) m v))]
    [nil "--config-path PATH"
-    "Path to surefire cofiguration file"
+    "Path to firecracker configuration file"
     :parse-fn #(string/split % #"\s*,\s*")
     :validate [(fn [paths]
                  #(.exists (file %)) paths)
@@ -86,17 +86,15 @@
 
 (defn parse-args [args]
   (let [{:keys [options arguments errors summary]} (parse-opts args cli-options)
-        config-content (with-open [rdr (reader (str (first (:config-path options))))]
-                         (reduce conj [] (line-seq rdr)))
-        parsed-json    (json/parse-string (first config-content) true)
+        parsed-json    (json/parse-stream (reader (str (first (:config-path options)))) true)
         new-additional-test-fields  (parse-additional-fields (json/generate-string (:additional-test-fields parsed-json)))
         new-additional-testset-fields (parse-additional-fields (json/generate-string (:additional-testset-fields parsed-json)))
         new-parsed-json    (merge parsed-json {:additional-testset-fields new-additional-testset-fields
                                                :additional-test-fields new-additional-test-fields
                                                })
-        options2 (merge options new-parsed-json)]
+        options (merge options new-parsed-json)]
     (cond
-      (:help options2)
+      (:help options)
       {:exit-message (usage summary) :ok? true}
 
       errors
@@ -105,46 +103,46 @@
       (= "test" (first arguments))
       (cond
         :else
-        {:exit-message (str options "\n\n" options2 "\n\n" new-additional-test-fields "\n\n" new-additional-testset-fields "\n\n" new-parsed-json)})
+        {:exit-message (str options "\n\n" parsed-json "\n\n" new-additional-test-fields "\n\n" new-additional-testset-fields "\n\n" new-parsed-json)})
 
       (= "create-testset" (first arguments))
       (cond
-        (nil? (:project-id options2))
+        (nil? (:project-id options))
         {:exit-message (missing-option-msg "create-testset" "project-id")}
 
-        (nil? (:author-id options2))
+        (nil? (:author-id options))
         {:exit-message (missing-option-msg "create-testset" "author-id")}
 
-        (nil? (:testset-name options2))
+        (nil? (:testset-name options))
         {:exit-message (missing-option-msg "create-testset" "testset-name")}
 
         :else
-        {:action "create-testset" :options options2})
+        {:action "create-testset" :options options})
 
       (= "populate-testset" (first arguments))
       (cond
-        (nil? (:project-id options2))
+        (nil? (:project-id options))
         {:exit-message (missing-option-msg "populate-testset" "project-id")}
 
-        (nil? (:testset-id options2))
+        (nil? (:testset-id options))
         {:exit-message (missing-option-msg "populate-testset" "testset-id")}
 
         :else
-        {:action "populate-testset" :options options2})
+        {:action "populate-testset" :options options})
 
       (= "create-and-populate-testset" (first arguments))
       (cond
-        (nil? (:project-id options2))
+        (nil? (:project-id options))
         {:exit-message (missing-option-msg "create-and-populate-testset" "project-id")}
 
-        (nil? (:author-id options2))
+        (nil? (:author-id options))
         {:exit-message (missing-option-msg "create-and-populate-testset" "author-id")}
 
-        (nil? (:testset-name options2))
+        (nil? (:testset-name options))
         {:exit-message (missing-option-msg "create-and-populate-testset" "testset-name")}
 
         :else
-        {:action "create-and-populate-testset" :options options2})
+        {:action "create-and-populate-testset" :options options})
 
       :else
       {:exit-message (format "\nUnsupported action [%s]\n\n%s" (first arguments) (usage summary))})))
