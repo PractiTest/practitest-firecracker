@@ -1,7 +1,7 @@
 (ns practitest-firecracker.cli
   (:require
    [clojure.tools.cli                :refer [parse-opts]]
-   [clojure.java.io                  :refer [file]]
+   [clojure.java.io                  :refer [file reader]]
    [clojure.walk                     :refer [postwalk]]
    [clojure.string                   :as string]
    [cheshire.core                    :as json]
@@ -23,6 +23,11 @@
                "Directory doesn't exist"]
     :assoc-fn (fn [m k v]
                 (reduce #(update %1 k conj %2) m v))]
+   [nil "--config-path PATH"
+    "Path to firecracker configuration file"
+    :validate [(fn [paths]
+                 #(.exists (file %)) paths)
+               "Config file doesn't exist"]]
    [nil "--project-id PROJECT-ID" "PractiTest Project ID"
     :parse-fn #(Integer/parseInt %)]
    [nil "--testset-name TESTSET-NAME" "PractiTest TestSet name"]
@@ -77,13 +82,25 @@
   (format "%s is required for '%s' action" option-name action-name))
 
 (defn parse-args [args]
-  (let [{:keys [options arguments errors summary]} (parse-opts args cli-options)]
+  (let [{:keys [options arguments errors summary]} (parse-opts args cli-options)
+        parsed-json    (json/parse-stream (reader (:config-path options)) true)
+        new-additional-test-fields  (parse-additional-fields (json/generate-string (:additional-test-fields parsed-json)))
+        new-additional-testset-fields (parse-additional-fields (json/generate-string (:additional-testset-fields parsed-json)))
+        new-parsed-json    (merge parsed-json {:additional-testset-fields new-additional-testset-fields
+                                               :additional-test-fields new-additional-test-fields
+                                               })
+        options (merge options new-parsed-json)]
     (cond
       (:help options)
       {:exit-message (usage summary) :ok? true}
 
       errors
       {:exit-message (error-msg errors)}
+
+      (= "test" (first arguments))
+      (cond
+        :else
+        {:exit-message (str options "\n\n" parsed-json "\n\n" new-additional-test-fields "\n\n" new-additional-testset-fields "\n\n" new-parsed-json)})
 
       (= "create-testset" (first arguments))
       (cond

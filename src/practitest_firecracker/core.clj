@@ -26,7 +26,8 @@
     (if exit-message
       (exit (if ok? 0 1) exit-message)
       (let [client  (make-client (select-keys options [:email :api-token :api-uri]))
-            reports (parse-reports-dir (:reports-path options))]
+            reports (parse-reports-dir (:reports-path options))
+            config (parse-reports-dir (:reports-path options))]
         (case action
           "create-testset"
           (let [testset (create-or-update-sf-testset client options reports)]
@@ -51,4 +52,7 @@
                                          :skip-validation? true
                                          :testset-id       (:id testset))
                                   reports))
-            (exit 0 (format "Populated TestSet ID: %s" (:id testset)))))))))
+            (exit 0 (format "Populated TestSet ID: %s" (:id testset))))
+          "test"
+          (let [testset (create-or-update-sf-testset client options reports config)]
+            (exit 0 (format "TestSet ID: %s" (:id testset)))))))))
