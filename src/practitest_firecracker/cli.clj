@@ -25,12 +25,9 @@
                 (reduce #(update %1 k conj %2) m v))]
    [nil "--config-path PATH"
     "Path to firecracker configuration file"
-    :parse-fn #(string/split % #"\s*,\s*")
     :validate [(fn [paths]
                  #(.exists (file %)) paths)
-               "Directory doesn't exist"]
-    :assoc-fn (fn [m k v]
-                (reduce #(update %1 k conj %2) m v))]
+               "Config file doesn't exist"]]
    [nil "--project-id PROJECT-ID" "PractiTest Project ID"
     :parse-fn #(Integer/parseInt %)]
    [nil "--testset-name TESTSET-NAME" "PractiTest TestSet name"]
@@ -86,7 +83,7 @@
 
 (defn parse-args [args]
   (let [{:keys [options arguments errors summary]} (parse-opts args cli-options)
-        parsed-json    (json/parse-stream (reader (str (first (:config-path options)))) true)
+        parsed-json    (json/parse-stream (reader (:config-path options)) true)
         new-additional-test-fields  (parse-additional-fields (json/generate-string (:additional-test-fields parsed-json)))
         new-additional-testset-fields (parse-additional-fields (json/generate-string (:additional-testset-fields parsed-json)))
         new-parsed-json    (merge parsed-json {:additional-testset-fields new-additional-testset-fields
