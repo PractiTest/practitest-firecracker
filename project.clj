@@ -11,8 +11,10 @@
                  [clj-http                                         "3.10.0"]
                  [org.apache.maven.surefire/surefire-report-parser "2.22.2"]
                  [org.clojure/tools.logging                        "0.4.1"]
-                 [ch.qos.logback/logback-classic                   "1.2.3"]]
-
+                 [ch.qos.logback/logback-classic                   "1.2.3"]
+                 ;; [github-PractiTest/test-xml-parser                "git@github.com:PractiTest/test-xml-parser.git"]
+                 [com.github.PractiTest/test-xml-parser            "e856a09cecfd7210926a3f5ae9f3802bea985bc4"]]
+  ;; github-PractiTest/test-xml-parser {:git/url "git@github.com:PractiTest/test-xml-parser.git" :deps/manifest :deps :sha "e856a09cecfd7210926a3f5ae9f3802bea985bc4"}
   :main ^:skip-aot practitest-firecracker.core
   :target-path "target/%s"
   :uberjar-name "practitest-firecracker-standalone.jar"
