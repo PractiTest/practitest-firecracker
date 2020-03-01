@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="rspec" tests="463" skipped="72" failures="0" errors="0" time="181.471359" timestamp="2019-10-17T11:54:16+00:00" hostname="fac3df87ce2e">
+<properties>
+<property name="seed" value="30603"/>
+</properties>
+<testcase classname="spec.controllers.api.v2.runs_controller_spec" name="Api::V2::RunsController show shows correctly -&gt; Manual run" file="./spec/controllers/api/v2/runs_controller_spec.rb" time="1.237213"></testcase>
+<testcase classname="spec.controllers.api.v2.runs_controller_spec" name="Api::V2::RunsController show shows correctly -&gt; Automated run" file="./spec/controllers/api/v2/runs_controller_spec.rb" time="0.556049"></testcase>
+<testcase classname="spec.controllers.api.v2.runs_controller_spec" name="Api::V2::RunsController show handles correctly bad project id" file="./spec/controllers/api/v2/runs_controller_spec.rb" time="0.567153"></testcase>
+<testcase classname="spec.models.suite_spec" name="Suite estimate duration works nicely with mix of et and tests" file="./spec/models/suite_spec.rb" time="2.872148"></testcase>
+<testcase classname="spec.models.suite_spec" name="Suite aggregations begins with no run steps" file="./spec/models/suite_spec.rb" time="1.810340"></testcase>
+<testcase classname="spec.models.suite_spec" name="Suite aggregations aggregates steps of when there&apos;s a step that ran" file="./spec/models/suite_spec.rb" time="2.082567"></testcase>
+<testcase classname="spec.models.suite_spec" name="Suite aggregations aggregates steps of last run for each instance only" file="./spec/models/suite_spec.rb" time="2.028625"></testcase>
+<testcase classname="spec.models.suite_spec" name="Suite digest email it has no duplicates, low level test" file="./spec/models/suite_spec.rb" time="1.674018"></testcase>
+<testcase classname="spec.models.suite_spec" name="Suite digest email does not record current user, low level test" file="./spec/models/suite_spec.rb" time="1.547852"></testcase>
+<testcase classname="spec.libs.integration_services.service_error_spec" name="IntegrationServices::ServiceError ServiceError new with redirect" file="./spec/libs/integration_services/service_error_spec.rb" time="0.000555"></testcase>
+</testsuite>

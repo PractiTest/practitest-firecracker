@@ -6,8 +6,13 @@
                                               populate-sf-results-old
                                               populate-sf-results
                                               create-or-update-sf-testset]]
-   [practitest-firecracker.surefire   :refer [parse-reports-dir]])
-  (:gen-class))
+   [practitest-firecracker.surefire   :refer [parse-reports-dir]]
+   ;; [test-xml-parser.core              :refer [parse-n-merge-data]]
+   ;; [test-xml-parser.core :as parser]
+   [clojure.pprint :as p]
+   )
+  (:gen-class)
+  (:import java.io.File))
 
 (defn exit [status msg]
   (println msg)
@@ -27,8 +32,22 @@
       (exit (if ok? 0 1) exit-message)
       (let [client  (make-client (select-keys options [:email :api-token :api-uri]))
             reports (parse-reports-dir (:reports-path options))
-            config (parse-reports-dir (:reports-path options))]
+            config  (parse-reports-dir (:reports-path options))
+            directory (clojure.java.io/file "/xml_reports")
+            files (file-seq directory)
+            ]
         (case action
+          "display-config"
+          (do
+            (p/pprint reports)
+            (println "========")
+            (p/pprint config)
+            (println "========")
+            (doseq [f files]
+              (p/pprint f))
+            (println "========")
+            )
+
           "create-testset"
           (let [testset (create-or-update-sf-testset client options reports)]
             (exit 0 (format "TestSet ID: %s" (:id testset))))

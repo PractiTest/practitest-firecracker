@@ -102,6 +102,11 @@
         :else
         {:exit-message (str options "\n\n" parsed-json "\n\n" new-additional-test-fields "\n\n" new-additional-testset-fields "\n\n" new-parsed-json)})
 
+      (= "display-config" (first arguments))
+      (cond
+        :else
+        {:action "display-config" :options options})
+
       (= "create-testset" (first arguments))
       (cond
         (nil? (:project-id options))
