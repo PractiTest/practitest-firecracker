@@ -1,0 +1,17 @@
+{:paths ["src" "test"]
+ :deps {org.clojure/clojure                              {:mvn/version "1.10.0"}
+        org.clojure/tools.cli                            {:mvn/version "0.4.2"}
+        cheshire                                         {:mvn/version "5.8.1"}
+        clj-http                                         {:mvn/version "3.10.0"}
+        org.apache.maven.surefire/surefire-report-parser {:mvn/version "2.22.2"}
+        org.clojure/tools.logging                        {:mvn/version "0.4.1"}
+        ch.qos.logback/logback-classic                   {:mvn/version "1.2.3"}
+        github-PractiTest/test-xml-parser                {:git/url "git@github.com:PractiTest/test-xml-parser.git" :deps/manifest :deps :sha "04de4b68bbb807ffc2fbdaf49d7d293ea26aedf2"}}
+ :aliases
+ {:dev {:extra-paths ["dev"]}
+  :package {:extra-paths ["resources" "target/cljs/"]}
+  :nrepl {:extra-deps {nrepl {:mvn/version "0.6.0"}}}
+  :uberdeps {:extra-deps {uberdeps {:mvn/version "0.1.8"}}
+             :main-opts ["-m" "uberdeps.uberjar"]}
+  }
+}

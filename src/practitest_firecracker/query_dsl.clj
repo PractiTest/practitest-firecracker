@@ -76,17 +76,8 @@
              (contains? test-suite key))      (key test-suite)
         (and (not (= test-case nil))
              (contains? test-case key))       (key test-case)
-        (string/starts-with? (str query) "?") (throw
-                                               (ex-info (format "Syntax error: unsupported variable '%s'" query)
-                                                        {:query query
-                                                         :key key
-                                                         :test-suite test-suite
-                                                         :test-case test-case}))
-        :else                                 (str query)
-        ;; (number? query)                       (str query)
-        ;; :else (str "else: " query " key: " key)
-        ;;:else (str "else: " query " key: " key)
-        ))))
+        (string/starts-with? (str query) "?") (str "")
+        :else                                 (str query)))))
 
 (defn read-query [s]
   (let [query    (edn/read-string s)
