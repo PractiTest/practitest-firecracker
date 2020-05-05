@@ -29,11 +29,9 @@
          uri     uri
          params  (cond-> {:basic-auth          credentials
                           :throw-exceptions    false
-                          :as                  :json
-                          :source              "firecracker"
-                          :firecracker-version fc-version}
-                   query-params (assoc :query-params query-params)
-                   form-params  (assoc :form-params form-params :content-type :json))]
+                          :as                  :json}
+                   query-params (assoc :query-params query-params :source "firecracker" :firecracker-version fc-version)
+                   form-params  (assoc :form-params form-params :content-type :json :source "firecracker" :firecracker-version fc-version))]
     (if (nil? uri)
       results
       (let [{:keys [status body]} (method uri params)]
