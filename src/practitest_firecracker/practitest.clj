@@ -8,6 +8,10 @@
    [practitest-firecracker.query-dsl :refer [query? eval-query]]))
 
 ;; ===========================================================================
+;; api version
+(def ^:const fc-version "1.3.5")
+
+;; ===========================================================================
 ;; utils
 
 (def backoff-timeout "Backoff timeout in seconds" 20)
@@ -23,9 +27,11 @@
           "both `query-params` and `form-params` can't be specified")
   (loop [results []
          uri     uri
-         params  (cond-> {:basic-auth credentials
-                          :throw-exceptions false
-                          :as :json}
+         params  (cond-> {:basic-auth          credentials
+                          :throw-exceptions    false
+                          :as                  :json
+                          :source              "firecracker"
+                          :firecracker-version fc-version}
                    query-params (assoc :query-params query-params)
                    form-params  (assoc :form-params form-params :content-type :json))]
     (if (nil? uri)
