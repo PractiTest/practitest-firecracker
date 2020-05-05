@@ -8,13 +8,10 @@
                                               create-or-update-sf-testset]]
    [practitest-firecracker.surefire   :refer [parse-reports-dir]]
    [test-xml-parser.core              :refer [send-directory]]
-   [clojure.zip :as zip]
-   [clojure.xml :as xml]
-   [clojure.pprint :as pprint]
-   [clojure.pprint :as p]
+   [clojure.pprint                    :as    pprint]
+   [clojure.java.io                   :refer [file]]
    )
-  (:gen-class)
-  (:import java.io.File))
+  (:gen-class))
 
 (defn exit [status msg]
   (println msg)
@@ -28,18 +25,6 @@
        (println (str ~module " elapsed time: " (/ (double (- (. System (nanoTime)) start#)) 1000000.0) " msecs")))
      ret#))
 
-(defn zip-str [s]
-  (zip/xml-zip
-   (xml/parse (java.io.ByteArrayInputStream. (.getBytes s)))))
-
-;; A common task it to load a file into a byte array.
-(defn file->bytes [file]
-  (with-open [xin (clojure.java.io/input-stream file)
-              xout (java.io.ByteArrayOutputStream.)]
-    (clojure.java.io/copy xin xout)
-    (.toByteArray xout)))
-                                        ;=> #'boot.user/file->bytes
-
 (defn -main [& args]
   (let [{:keys [action options exit-message ok?]} (parse-args args)]
     (if exit-message
@@ -47,7 +32,7 @@
       (let [client  (make-client (select-keys options [:email :api-token :api-uri]))
             reports (parse-reports-dir (:reports-path options))
             config  (parse-reports-dir (:reports-path options))
-            directory (clojure.java.io/file (first (:reports-path options)))
+            directory (file (first (:reports-path options)))
             additional-config  (send-directory directory config)
             additional-reports (send-directory directory reports)]
         (case action
