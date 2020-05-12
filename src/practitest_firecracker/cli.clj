@@ -30,6 +30,8 @@
                "Config file doesn't exist"]]
    [nil "--project-id PROJECT-ID" "PractiTest Project ID"
     :parse-fn #(Integer/parseInt %)]
+   [nil "--max-api-rate MAX-API-RATE" "API LIMIT in seconds"
+    :parse-fn #(Integer/parseInt %) :default 30]
    [nil "--testset-name TESTSET-NAME" "PractiTest TestSet name"]
    [nil "--testset-id TESTSET-ID" "PractiTest TestSet ID"
     :parse-fn #(Integer/parseInt %)]
@@ -81,15 +83,19 @@
 (defn missing-option-msg [action-name option-name]
   (format "%s is required for '%s' action" option-name action-name))
 
-(defn parse-args [args]
-  (let [{:keys [options arguments errors summary]} (parse-opts args cli-options)
-        parsed-json    (json/parse-stream (reader (:config-path options)) true)
+(defn parse-config-file [options]
+  (let [parsed-json    (json/parse-stream (reader (:config-path options)) true)
         new-additional-test-fields  (parse-additional-fields (json/generate-string (:additional-test-fields parsed-json)))
         new-additional-testset-fields (parse-additional-fields (json/generate-string (:additional-testset-fields parsed-json)))
         new-parsed-json    (merge parsed-json {:additional-testset-fields new-additional-testset-fields
                                                :additional-test-fields new-additional-test-fields
-                                               })
-        options (merge options new-parsed-json)]
+                                               })]
+    new-parsed-json))
+
+(defn parse-args [args]
+  (let [{:keys [options arguments errors summary]} (parse-opts args cli-options)
+        new-parsed-json  (when (not (= (:config-path options) nil)) (parse-config-file options))
+        options          (merge options new-parsed-json)]
     (cond
       (:help options)
       {:exit-message (usage summary) :ok? true}
@@ -97,15 +103,15 @@
       errors
       {:exit-message (error-msg errors)}
 
-      (= "test" (first arguments))
-      (cond
-        :else
-        {:exit-message (str options "\n\n" parsed-json "\n\n" new-additional-test-fields "\n\n" new-additional-testset-fields "\n\n" new-parsed-json)})
-
       (= "display-config" (first arguments))
       (cond
         :else
         {:action "display-config" :options options})
+
+      (= "display-options" (first arguments))
+      (cond
+        :else
+        {:action "display-options" :options options})
 
       (= "create-testset" (first arguments))
       (cond

@@ -30,8 +30,8 @@
          params  (cond-> {:basic-auth          credentials
                           :throw-exceptions    false
                           :as                  :json}
-                   query-params (assoc :query-params query-params :source "firecracker" :firecracker-version fc-version)
-                   form-params  (assoc :form-params form-params :content-type :json :source "firecracker" :firecracker-version fc-version))]
+                   query-params (assoc :query-params query-params :source "firecracker" :firecracker-version fc-version :socket-timeout 30000 :connection-timeout 30000)
+                   form-params  (assoc :form-params form-params :content-type :json :source "firecracker" :firecracker-version fc-version :socket-timeout 30000 :connection-timeout 30000))]
     (if (nil? uri)
       results
       (let [{:keys [status body]} (method uri params)]

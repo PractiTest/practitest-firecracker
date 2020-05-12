@@ -41,6 +41,11 @@
             (pprint/pprint {"=============== FC original reports val: ===============" reports})
             (pprint/pprint {"=============== FC result: ===============" result}))
 
+          "display-options"
+          (do
+            (pprint/pprint {"=============== options: ===============" options})
+            (pprint/pprint {"=============== args: ===============" args}))
+
           "create-testset"
           (let [testset (create-or-update-sf-testset client options additional-reports)]
             (exit 0 (format "TestSet ID: %s" (:id testset))))
