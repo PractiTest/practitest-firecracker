@@ -30,8 +30,8 @@
                "Config file doesn't exist"]]
    [nil "--project-id PROJECT-ID" "PractiTest Project ID"
     :parse-fn #(Integer/parseInt %)]
-   [nil "--max-api-rate MAX-API-RATE" "API LIMIT in seconds"
-    :parse-fn #(Integer/parseInt %) :default 30]
+   [nil "--max-api-rate MAX-API-RATE" "API LIMIT in milliseconds"
+    :parse-fn #(Integer/parseInt %) :default 30000]
    [nil "--testset-name TESTSET-NAME" "PractiTest TestSet name"]
    [nil "--testset-id TESTSET-ID" "PractiTest TestSet ID"
     :parse-fn #(Integer/parseInt %)]
