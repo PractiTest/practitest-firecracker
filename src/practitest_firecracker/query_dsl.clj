@@ -87,8 +87,10 @@
                        {:op   (compile-query op)
                         :args (vec (map compile-query args))})
                      query))]
-    (with-meta (compiler query)
-      {:query true})))
+    (if (not (or (= java.lang.Long (type query)) (= java.lang.Double (type query))))
+      (with-meta (compiler query)
+        {:query true})
+      (compiler query))))
 
 (defn query? [obj]
   (boolean (:query (meta obj))))

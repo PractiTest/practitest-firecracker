@@ -324,6 +324,7 @@
   (let [[test-def step-defs]   (sf-test-suite->test-def options sf-test-suite)
         test                   (ll-find-test client project-id (:name test-def) (:api-max-rate options))
         additional-test-fields (eval-additional-fields sf-test-suite (:additional-test-fields options))
+        additional-test-fields (merge additional-test-fields (:system-fields additional-test-fields))
         api-max-rate           (:api-max-rate options)]
     (ensure-custom-field-values client project-id (:custom-fields additional-test-fields) api-max-rate)
     (if test
@@ -339,6 +340,7 @@
 (defn update-sf-test [client {:keys [project-id] :as options} sf-test-suite test-id]
   (let [[test-def step-defs]   (sf-test-suite->test-def options sf-test-suite)
         additional-test-fields (eval-additional-fields sf-test-suite (:additional-test-fields options))
+        additional-test-fields (merge additional-test-fields (:system-fields additional-test-fields))
         api-max-rate           (:api-max-rate options)]
     (ensure-custom-field-values client project-id (:custom-fields additional-test-fields) api-max-rate)
     (ll-update-test client
@@ -351,15 +353,17 @@
                     api-max-rate)))
 
 (defn update-sf-testset [client {:keys [project-id] :as options} sf-test-suite testset-id]
-  (let [[test-def step-defs] (sf-test-suite->test-def options sf-test-suite)
-        api-max-rate         (:api-max-rate options)]
-    (ensure-custom-field-values client project-id (:custom-fields (:additional-testset-fields options)) api-max-rate)
+  (let [[test-def step-defs]       (sf-test-suite->test-def options sf-test-suite)
+        api-max-rate               (:api-max-rate options)
+        additional-testset-fields  (:additional-testset-fields options)
+        additional-testset-fields  (merge additional-testset-fields (:system-fields additional-testset-fields))]
+    (ensure-custom-field-values client project-id (:custom-fields additional-testset-fields) api-max-rate)
     (ll-update-testset client
                     project-id
                     (merge test-def
                            {:name (:testset-name options)}
                            {:author-id (:author-id options)}
-                           (:additional-testset-fields options))
+                           additional-testset-fields)
                     step-defs
                     testset-id
                     api-max-rate)))
@@ -369,12 +373,14 @@
     (ll-create-testset client project-id (merge {:name sf-name} additional-testset-fields) (map :id tests)) api-max-rate))
 
 (defn create-sf-testset [client options sf-test-suites]
-  (let [tests        (map (partial create-sf-test client options) sf-test-suites)
+  (let [tests                      (map (partial create-sf-test client options) sf-test-suites)
+        additional-testset-fields  (:additional-testset-fields options)
+        additional-testset-fields  (merge additional-testset-fields (:system-fields additional-testset-fields))
         api-max-rate (:api-max-rate options)]
     (ll-create-testset client
                        (:project-id options)
                        (merge {:name (:testset-name options)}
-                              (:additional-testset-fields options))
+                              additional-testset-fields)
                        (map :id tests)
                        api-max-rate)))
 
