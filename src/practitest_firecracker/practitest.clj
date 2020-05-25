@@ -26,34 +26,34 @@
   (assert (not (and query-params form-params))
           "both `query-params` and `form-params` can't be specified")
   (loop [results []
-         uri     uri
-         params  (cond-> {:basic-auth          credentials
-                          :throw-exceptions    false
-                          :as                  :json}
-                   query-params (assoc :query-params (conj query-params {:source "firecracker" :firecracker-version fc-version}) :socket-timeout max-api-rate :connection-timeout max-api-rate)
-                   form-params  (assoc :form-params (conj form-params {:source "firecracker" :firecracker-version fc-version}) :content-type :json :socket-timeout max-api-rate :connection-timeout max-api-rate))]
-    (if (nil? uri)
-      results
-      (let [{:keys [status body]} (method uri params)]
-        (case status
-          504 (do
-                ;; load balancer freaking out, lets try again
-                (Thread/sleep 1000)
-                (recur results uri params))
-          429 (do
-                (log/warnf "API rate limit reached, waiting for %s seconds" backoff-timeout)
-                (Thread/sleep (* backoff-timeout 1000))
-                (recur results uri params))
-          200 (let [data (:data body)]
-                (recur (vec
-                        (if (sequential? data)
-                          (concat results data)
-                          (conj results data)))
-                       (get-in body [:links :next])
-                       (dissoc params :query-params)))
-          (throw (ex-info "API request failed" {:status status
-                                                :body   body
-                                                :uri    uri})))))))
+            uri     uri
+            params  (cond-> {:basic-auth          credentials
+                             :throw-exceptions    false
+                             :as                  :json}
+                      query-params (assoc :query-params (conj query-params {:source "firecracker" :firecracker-version fc-version}) :socket-timeout max-api-rate :connection-timeout max-api-rate)
+                      form-params  (assoc :form-params (conj form-params {:source "firecracker" :firecracker-version fc-version}) :content-type :json :socket-timeout max-api-rate :connection-timeout max-api-rate))]
+       (if (nil? uri)
+         results
+         (let [{:keys [status body]} (method uri params)]
+           (case status
+             504 (do
+                   ;; load balancer freaking out, lets try again
+                   (Thread/sleep 1000)
+                   (recur results uri params))
+             429 (do
+                   (log/warnf "API rate limit reached, waiting for %s seconds" backoff-timeout)
+                   (Thread/sleep (* backoff-timeout 1000))
+                   (recur results uri params))
+             200 (let [data (:data body)]
+                   (recur (vec
+                           (if (sequential? data)
+                             (concat results data)
+                             (conj results data)))
+                          (get-in body [:links :next])
+                          (dissoc params :query-params)))
+             (throw (ex-info "API request failed" {:status status
+                                                   :body   body
+                                                   :uri    uri})))))))
 
 ;; ===========================================================================
 ;; constants
