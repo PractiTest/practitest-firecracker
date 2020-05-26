@@ -5,7 +5,12 @@
    [clojure.walk                     :refer [postwalk]]
    [clojure.string                   :as string]
    [cheshire.core                    :as json]
-   [practitest-firecracker.query-dsl :refer [read-query]]))
+   [practitest-firecracker.query-dsl :refer [read-query]]
+   [throttler.core                   :refer [fn-throttler]]))
+
+(defn create-api-throttler [rate]
+  (let [fn-th (fn-throttler rate :minute)]
+    fn-th))
 
 (defn parse-additional-fields [v]
   (postwalk #(if (string? %) (read-query %) %)
@@ -30,8 +35,8 @@
                "Config file doesn't exist"]]
    [nil "--project-id PROJECT-ID" "PractiTest Project ID"
     :parse-fn #(Integer/parseInt %)]
-   [nil "--max-api-rate MAX-API-RATE" "API LIMIT in milliseconds"
-    :parse-fn #(Integer/parseInt %) :default 30000]
+   [nil "--max-api-rate MAX-API-RATE" "API LIMIT in call per minute"
+    :parse-fn #(Integer/parseInt %) :default 30]
    [nil "--testset-name TESTSET-NAME" "PractiTest TestSet name"]
    [nil "--testset-id TESTSET-ID" "PractiTest TestSet ID"
     :parse-fn #(Integer/parseInt %)]
@@ -88,14 +93,14 @@
         new-additional-test-fields  (parse-additional-fields (json/generate-string (:additional-test-fields parsed-json)))
         new-additional-testset-fields (parse-additional-fields (json/generate-string (:additional-testset-fields parsed-json)))
         new-parsed-json    (merge parsed-json {:additional-testset-fields new-additional-testset-fields
-                                               :additional-test-fields new-additional-test-fields
-                                               })]
+                                               :additional-test-fields new-additional-test-fields})]
     new-parsed-json))
 
 (defn parse-args [args]
   (let [{:keys [options arguments errors summary]} (parse-opts args cli-options)
         new-parsed-json  (when (not (= (:config-path options) nil)) (parse-config-file options))
-        options          (merge options new-parsed-json)]
+        options          (merge options new-parsed-json)
+        options          (assoc options :max-api-rate-throttler (create-api-throttler (:max-api-rate options)))]
     (cond
       (:help options)
       {:exit-message (usage summary) :ok? true}

@@ -5,9 +5,7 @@
    [clojure.walk                     :refer [postwalk]]
    [clj-http.client                  :as http]
    [clojure.tools.logging            :as log]
-   [practitest-firecracker.query-dsl :refer [query? eval-query]]
-   [throttler.core                   :refer [throttle-chan throttle-fn]]
-   ))
+   [practitest-firecracker.query-dsl :refer [query? eval-query]]))
 
 ;; ===========================================================================
 ;; api version
@@ -15,10 +13,6 @@
 
 ;; ===========================================================================
 ;; utils
-
-;; (def +# (throttle-fn + 100 :second))
-
-;; (+# 1 1)
 
 (def backoff-timeout "Backoff timeout in seconds" 20)
 (def run-batch-bucket-size 10)
@@ -28,7 +22,7 @@
 (defn build-uri [base-uri resource-uri-template & params]
   (apply format (str base-uri resource-uri-template) params))
 
-(defn api-call [{:keys [credentials uri method query-params form-params max-api-rate]}]
+(defn api-call [{:keys [credentials uri method query-params form-params]}]
   (assert (not (and query-params form-params))
           "both `query-params` and `form-params` can't be specified")
   (loop [results []
@@ -36,8 +30,8 @@
             params  (cond-> {:basic-auth          credentials
                              :throw-exceptions    false
                              :as                  :json}
-                      query-params (assoc :query-params (conj query-params {:source "firecracker" :firecracker-version fc-version}) :socket-timeout max-api-rate :connection-timeout max-api-rate)
-                      form-params  (assoc :form-params (conj form-params {:source "firecracker" :firecracker-version fc-version}) :content-type :json :socket-timeout max-api-rate :connection-timeout max-api-rate))]
+                      query-params (assoc :query-params (conj query-params {:source "firecracker" :firecracker-version fc-version}) )
+                      form-params  (assoc :form-params (conj form-params {:source "firecracker" :firecracker-version fc-version}) :content-type :json))]
        (if (nil? uri)
          results
          (let [{:keys [status body]} (method uri params)]
@@ -87,174 +81,158 @@
                      (if (string/ends-with? api-uri "/") "" "/")
                      "api/v2")})
 
-(defn ll-testset [{:keys [base-uri credentials]} project-id id max-api-rate]
+(defn ll-testset [{:keys [base-uri credentials]} project-id id max-api-rate-throttler]
   (let [uri (build-uri base-uri testset-uri project-id (if (string? id)
                                                          (Long/parseLong id)
                                                          id))]
     (first
      (api-call {:credentials  credentials
                 :uri          uri
-                :method       http/get
-                :max-api-rate max-api-rate}))))
+                :method       (max-api-rate-throttler http/get)}))))
 
-(defn ll-testset-instances [{:keys [base-uri credentials]} project-id testset-id max-api-rate]
+(defn ll-testset-instances [{:keys [base-uri credentials]} project-id testset-id max-api-rate-throttler]
   (let [uri (build-uri base-uri testset-instances-uri project-id)]
     (api-call {:credentials  credentials
                :uri          uri
-               :method       http/get
-               :query-params {:set-ids testset-id}
-               :max-api-rate max-api-rate})))
+               :method       (max-api-rate-throttler http/get)
+               :query-params {:set-ids testset-id}})))
 
-(defn ll-test [{:keys [base-uri credentials]} project-id id max-api-rate]
+(defn ll-test [{:keys [base-uri credentials]} project-id id max-api-rate-throttler]
   (let [uri (build-uri base-uri test-uri project-id id)]
     (first
      (api-call {:credentials  credentials
                 :uri          uri
-                :method       http/get
-                :max-api-rate max-api-rate}))))
+                :method       (max-api-rate-throttler http/get)}))))
 
-(defn ll-test-steps [{:keys [base-uri credentials]} project-id test-id max-api-rate]
+(defn ll-test-steps [{:keys [base-uri credentials]} project-id test-id max-api-rate-throttler]
   (let [uri (build-uri base-uri test-steps-uri project-id)]
     (api-call {:credentials  credentials
                :uri          uri
-               :method       http/get
-               :query-params {:test-ids test-id}
-               :max-api-rate max-api-rate})))
+               :method       (max-api-rate-throttler http/get)
+               :query-params {:test-ids test-id}})))
 
-(defn ll-create-test [{:keys [base-uri credentials]} project-id attributes steps max-api-rate]
+(defn ll-create-test [{:keys [base-uri credentials]} project-id attributes steps max-api-rate-throttler]
   (let [uri (build-uri base-uri create-test-uri project-id)]
     (first
      (api-call {:credentials  credentials
                 :uri          uri
-                :method       http/post
+                :method       (max-api-rate-throttler http/post)
                 :form-params  {:data {:type       "tests"
                                       :attributes attributes
-                                      :steps      {:data steps}}}
-                :max-api-rate max-api-rate}))))
+                                      :steps      {:data steps}}}}))))
 
-(defn ll-create-testset [{:keys [base-uri credentials]} project-id attributes test-ids max-api-rate]
+(defn ll-create-testset [{:keys [base-uri credentials]} project-id attributes test-ids max-api-rate-throttler]
   (let [uri (build-uri base-uri create-testset-uri project-id)]
     (first
      (api-call {:credentials  credentials
                 :uri          uri
-                :method       http/post
+                :method       (max-api-rate-throttler http/post)
                 :form-params  {:data {:type       "sets"
                                       :attributes attributes
-                                      :instances  {:test-ids test-ids}}}
-                :max-api-rate max-api-rate}))))
+                                      :instances  {:test-ids test-ids}}}}))))
 
-(defn ll-create-instance [{:keys [base-uri credentials]} project-id testset-id test-id max-api-rate]
+(defn ll-create-instance [{:keys [base-uri credentials]} project-id testset-id test-id max-api-rate-throttler]
   ;; TODO: bulk-create instances (same set id, multiple test ids)
   (let [uri (build-uri base-uri create-instance-uri project-id)]
     (first
      (api-call {:credentials  credentials
                 :uri          uri
-                :method       http/post
+                :method       (max-api-rate-throttler http/post)
                 :form-params  {:data {:type       "instances"
                                       :attributes {:set-id  testset-id
-                                                   :test-id test-id}}}
-                :max-api-rate max-api-rate}))))
+                                                   :test-id test-id}}}}))))
 
-(defn ll-create-run [{:keys [base-uri credentials]} project-id instance-id attributes steps max-api-rate]
+(defn ll-create-run [{:keys [base-uri credentials]} project-id instance-id attributes steps max-api-rate-throttler]
   (let [uri (build-uri base-uri create-run-uri project-id)]
     (first
      (api-call {:credentials  credentials
                 :uri          uri
-                :method       http/post
+                :method       (max-api-rate-throttler http/post)
                 :form-params  {:data {:type       "instances"
                                       :attributes (assoc attributes :instance-id instance-id)
-                                      :steps      {:data steps}}}
-                :max-api-rate max-api-rate}))))
+                                      :steps      {:data steps}}}}))))
 
-(defn ll-create-runs [{:keys [base-uri credentials]} project-id runs max-api-rate]
+(defn ll-create-runs [{:keys [base-uri credentials]} project-id runs max-api-rate-throttler]
   (let [uri (build-uri base-uri create-run-uri project-id)]
     (api-call {:credentials  credentials
                :uri          uri
-               :method       http/post
+               :method       (max-api-rate-throttler http/post)
                :form-params  {:data (for [[instance-id attributes steps] runs]
                                       {:type       "instances"
                                        :attributes (assoc attributes :instance-id instance-id)
-                                       :steps      {:data steps}})}
-               :max-api-rate max-api-rate})))
+                                       :steps      {:data steps}})}})))
 
-(defn ll-find-test [{:keys [base-uri credentials]} project-id name max-api-rate]
+(defn ll-find-test [{:keys [base-uri credentials]} project-id name max-api-rate-throttler]
   (let [uri (build-uri base-uri list-tests-uri project-id)]
     ;; in case there are more than one test with this name, return the first one
     (first
      (api-call {:credentials  credentials
                 :uri          uri
-                :method       http/get
-                :query-params {:name_exact name}
-                :max-api-rate max-api-rate}))))
+                :method       (max-api-rate-throttler http/get)
+                :query-params {:name_exact name}}))))
 
-(defn ll-find-instance [{:keys [base-uri credentials]} project-id testset-id test-id max-api-rate]
+(defn ll-find-instance [{:keys [base-uri credentials]} project-id testset-id test-id max-api-rate-throttler]
   (let [uri (build-uri base-uri testset-instances-uri project-id)]
     (first
      (api-call {:credentials  credentials
                 :uri          uri
-                :method       http/get
+                :method       (max-api-rate-throttler http/get)
                 :query-params {:set-ids  testset-id
-                               :test-ids test-id}
-                :max-api-rate max-api-rate}))))
+                               :test-ids test-id}}))))
 
-(defn ll-find-testset [{:keys [base-uri credentials]} project-id name max-api-rate]
+(defn ll-find-testset [{:keys [base-uri credentials]} project-id name max-api-rate-throttler]
   (let [uri (build-uri base-uri list-testsets-uri project-id)]
     (first
      (api-call {:credentials  credentials
                 :uri          uri
-                :method       http/get
-                :query-params {:name_exact name}
-                :max-api-rate max-api-rate}))))
+                :method       (max-api-rate-throttler http/get)
+                :query-params {:name_exact name}}))))
 
-(defn ll-get-custom-field [{:keys [base-uri credentials]} project-id cf-id max-api-rate]
+(defn ll-get-custom-field [{:keys [base-uri credentials]} project-id cf-id max-api-rate-throttler]
   (let [uri (build-uri base-uri custom-field-uri project-id cf-id)]
     (first
      (api-call {:credentials  credentials
                 :uri          uri
-                :method       http/get
-                :max-api-rate max-api-rate}))))
+                :method       (max-api-rate-throttler http/get)}))))
 
-(defn ll-update-custom-field [{:keys [base-uri credentials]} project-id cf-id possible-values max-api-rate]
+(defn ll-update-custom-field [{:keys [base-uri credentials]} project-id cf-id possible-values max-api-rate-throttler]
   (let [uri (build-uri base-uri custom-field-uri project-id cf-id)]
     (first
      (api-call {:credentials  credentials
                 :uri          uri
-                :method       http/put
+                :method       (max-api-rate-throttler http/put)
                 :form-params  {:data {:type       "custom_field"
-                                      :attributes {:possible-values possible-values}}}
-                :max-api-rate max-api-rate}))))
+                                      :attributes {:possible-values possible-values}}}}))))
 
-(defn ll-update-test [{:keys [base-uri credentials]} project-id attributes steps cf-id max-api-rate]
+(defn ll-update-test [{:keys [base-uri credentials]} project-id attributes steps cf-id max-api-rate-throttler]
   (let [uri (build-uri base-uri update-test-uri project-id cf-id)]
     (first
      (api-call {:credentials  credentials
                 :uri          uri
-                :method       http/put
+                :method       (max-api-rate-throttler http/put)
                 :form-params  {:data {:type       "tests"
                                       :attributes attributes
-                                      :steps      {:data steps}}}
-                :max-api-rate max-api-rate}))))
+                                      :steps      {:data steps}}}}))))
 
-(defn ll-update-testset [{:keys [base-uri credentials]} project-id attributes steps cf-id max-api-rate]
+(defn ll-update-testset [{:keys [base-uri credentials]} project-id attributes steps cf-id max-api-rate-throttler]
   (let [uri (build-uri base-uri update-testset-uri project-id cf-id)]
     (first
      (api-call {:credentials  credentials
                 :uri          uri
-                :method       http/put
+                :method       (max-api-rate-throttler http/put)
                 :form-params  {:data {:type       "sets"
                                       :attributes attributes
-                                      :steps      {:data steps}}}
-                :max-api-rate max-api-rate}))))
+                                      :steps      {:data steps}}}}))))
 
-(defn testset [client project-id id max-api-rate]
-  (let [testset   (ll-testset client project-id id max-api-rate)
-        instances (ll-testset-instances client project-id id max-api-rate)
+(defn testset [client project-id id max-api-rate-throttler]
+  (let [testset   (ll-testset client project-id id max-api-rate-throttler)
+        instances (ll-testset-instances client project-id id max-api-rate-throttler)
         tests     (->> instances
                        (map #(get-in % [:attributes :test-id]))
                        (remove nil?)
-                       (map #(ll-test client project-id % max-api-rate))
+                       (map #(ll-test client project-id % max-api-rate-throttler))
                        (map (fn [{:keys [id] :as t}]
-                              (assoc t :steps (ll-test-steps client project-id id max-api-rate)))))]
+                              (assoc t :steps (ll-test-steps client project-id id max-api-rate-throttler)))))]
     {:id         id
      :display-id (get-in testset [:attributes :display-id])
      :name       (get-in testset [:attributes :name])
@@ -297,12 +275,12 @@
   [{:name (str (:package-name test-suite) ":" (:name test-suite))}
    (map sf-test-case->step-def-old (:test-cases test-suite))])
 
-(defn create-sf-test-old [client project-id author-id additional-fields sf-test-suite max-api-rate]
+(defn create-sf-test-old [client project-id author-id additional-fields sf-test-suite max-api-rate-throttler]
   (let [[test-def step-defs] (sf-test-suite->test-def-old sf-test-suite)
-        test                 (ll-find-test client project-id (:name test-def) max-api-rate)]
+        test                 (ll-find-test client project-id (:name test-def) max-api-rate-throttler)]
     (if test
       test
-      (ll-create-test client project-id (merge test-def {:author-id author-id} additional-fields) step-defs max-api-rate))))
+      (ll-create-test client project-id (merge test-def {:author-id author-id} additional-fields) step-defs max-api-rate-throttler))))
 
 (defn sf-test-case->step-def [options test-case]
   {:name (sf-test-case->pt-step-name options test-case)})
@@ -311,28 +289,28 @@
   [{:name (sf-test-suite->pt-test-name options test-suite)}
    (map (partial sf-test-case->step-def options) (:test-cases test-suite))])
 
-(defn ensure-custom-field-values [client project-id custom-fields max-api-rate]
+(defn ensure-custom-field-values [client project-id custom-fields max-api-rate-throttler]
   (doseq [[cf v] custom-fields
           :let   [cf-id (some-> (last (re-find #"^---f-(\d+)$" (name cf)))
                                 (Long/parseLong))]
           :when  (not (nil? cf-id))]
     (when-not (contains? @custom-field-cache cf-id)
-      (let [cf (ll-get-custom-field client project-id cf-id max-api-rate)]
+      (let [cf (ll-get-custom-field client project-id cf-id max-api-rate-throttler)]
         (swap! custom-field-cache assoc cf-id [(get-in cf [:attributes :field-format])
                                                (set (get-in cf [:attributes :possible-values]))])))
     (let [[field-format possible-values] (get @custom-field-cache cf-id)]
       (when (= "list" field-format)
         (when-not (contains? possible-values v)
           (swap! custom-field-cache update-in [cf-id 1] conj v)
-          (ll-update-custom-field client project-id cf-id (vec (conj possible-values v)) max-api-rate))))))
+          (ll-update-custom-field client project-id cf-id (vec (conj possible-values v)) max-api-rate-throttler))))))
 
 (defn create-sf-test [client {:keys [project-id] :as options} sf-test-suite]
   (let [[test-def step-defs]   (sf-test-suite->test-def options sf-test-suite)
-        test                   (ll-find-test client project-id (:name test-def) (:max-api-rate options))
+        test                   (ll-find-test client project-id (:name test-def) (:max-api-rate-throttler options))
         additional-test-fields (eval-additional-fields sf-test-suite (:additional-test-fields options))
         additional-test-fields (merge additional-test-fields (:system-fields additional-test-fields))
-        max-api-rate           (:max-api-rate options)]
-    (ensure-custom-field-values client project-id (:custom-fields additional-test-fields) max-api-rate)
+        max-api-rate-throttler           (:max-api-rate-throttler options)]
+    (ensure-custom-field-values client project-id (:custom-fields additional-test-fields) max-api-rate-throttler)
     (if test
       test
       (ll-create-test client
@@ -341,14 +319,14 @@
                              {:author-id (:author-id options)}
                              additional-test-fields)
                       step-defs
-                      max-api-rate))))
+                      max-api-rate-throttler))))
 
 (defn update-sf-test [client {:keys [project-id] :as options} sf-test-suite test-id]
   (let [[test-def step-defs]   (sf-test-suite->test-def options sf-test-suite)
         additional-test-fields (eval-additional-fields sf-test-suite (:additional-test-fields options))
         additional-test-fields (merge additional-test-fields (:system-fields additional-test-fields))
-        max-api-rate           (:max-api-rate options)]
-    (ensure-custom-field-values client project-id (:custom-fields additional-test-fields) max-api-rate)
+        max-api-rate-throttler           (:max-api-rate-throttler options)]
+    (ensure-custom-field-values client project-id (:custom-fields additional-test-fields) max-api-rate-throttler)
     (ll-update-test client
                     project-id
                     (merge test-def
@@ -356,14 +334,14 @@
                            additional-test-fields)
                     step-defs
                     test-id
-                    max-api-rate)))
+                    max-api-rate-throttler)))
 
 (defn update-sf-testset [client {:keys [project-id] :as options} sf-test-suite testset-id]
   (let [[test-def step-defs]       (sf-test-suite->test-def options sf-test-suite)
-        max-api-rate               (:max-api-rate options)
+        max-api-rate-throttler               (:max-api-rate-throttler options)
         additional-testset-fields  (:additional-testset-fields options)
         additional-testset-fields  (merge additional-testset-fields (:system-fields additional-testset-fields))]
-    (ensure-custom-field-values client project-id (:custom-fields additional-testset-fields) max-api-rate)
+    (ensure-custom-field-values client project-id (:custom-fields additional-testset-fields) max-api-rate-throttler)
     (ll-update-testset client
                     project-id
                     (merge test-def
@@ -372,23 +350,23 @@
                            additional-testset-fields)
                     step-defs
                     testset-id
-                    max-api-rate)))
+                    max-api-rate-throttler)))
 
-(defn create-sf-testset-old [client project-id author-id additional-test-fields sf-name additional-testset-fields sf-test-suites max-api-rate]
+(defn create-sf-testset-old [client project-id author-id additional-test-fields sf-name additional-testset-fields sf-test-suites max-api-rate-throttler]
   (let [tests (map (partial create-sf-test client project-id author-id additional-test-fields) sf-test-suites)]
-    (ll-create-testset client project-id (merge {:name sf-name} additional-testset-fields) (map :id tests)) max-api-rate))
+    (ll-create-testset client project-id (merge {:name sf-name} additional-testset-fields) (map :id tests)) max-api-rate-throttler))
 
 (defn create-sf-testset [client options sf-test-suites]
   (let [tests                      (map (partial create-sf-test client options) sf-test-suites)
         additional-testset-fields  (:additional-testset-fields options)
         additional-testset-fields  (merge additional-testset-fields (:system-fields additional-testset-fields))
-        max-api-rate (:max-api-rate options)]
+        max-api-rate-throttler (:max-api-rate-throttler options)]
     (ll-create-testset client
                        (:project-id options)
                        (merge {:name (:testset-name options)}
                               additional-testset-fields)
                        (map :id tests)
-                       max-api-rate)))
+                       max-api-rate-throttler)))
 
 (defn sf-test-case->run-step-def-old [test-case]
   {:name           (:full-name test-case)
@@ -399,14 +377,14 @@
   [{:run-duration (:time-elapsed test-suite)}
    (map sf-test-case->run-step-def-old (:test-cases test-suite))])
 
-(defn validate-testset [client project-id testset-id sf-test-suites max-api-rate]
+(defn validate-testset [client project-id testset-id sf-test-suites max-api-rate-throttler]
   ;; check that all tests exist in the given testset
   ;; if not -- throw exception, the user will need to create another testset
   ;; otherwise -- go on
-  (let [instances (ll-testset-instances client project-id testset-id max-api-rate)
+  (let [instances (ll-testset-instances client project-id testset-id max-api-rate-throttler)
         tests     (map (fn [test-suite]
                          (let [name (str (:package-name test-suite) ":" (:name test-suite))]
-                           [name (ll-find-test client project-id name max-api-rate)]))
+                           [name (ll-find-test client project-id name max-api-rate-throttler)]))
                        sf-test-suites)
         nil-tests (filter #(nil? (last %)) tests)]
     (when (seq nil-tests)
@@ -419,16 +397,16 @@
         (throw (ex-info "some tests are not part of the given testset" {:test-ids not-in-ts}))))
     true))
 
-(defn populate-sf-results-old [client project-id testset-id sf-test-suites max-api-rate]
+(defn populate-sf-results-old [client project-id testset-id sf-test-suites max-api-rate-throttler]
   (log/infof "populating testset %s with results from %d suites" testset-id (count sf-test-suites))
-  (when (validate-testset client project-id testset-id sf-test-suites max-api-rate)
+  (when (validate-testset client project-id testset-id sf-test-suites max-api-rate-throttler)
     (doall
      (map (fn [sf-test-suite]
             (let [test-name       (str (:package-name sf-test-suite) ":" (:name sf-test-suite))
-                  test            (ll-find-test client project-id test-name max-api-rate)
-                  instance        (ll-find-instance client project-id testset-id (:id test) max-api-rate)
+                  test            (ll-find-test client project-id test-name max-api-rate-throttler)
+                  instance        (ll-find-instance client project-id testset-id (:id test) max-api-rate-throttler)
                   [run run-steps] (sf-test-suite->run-def-old sf-test-suite)]
-              (ll-create-run client project-id (:id instance) run run-steps) max-api-rate))
+              (ll-create-run client project-id (:id instance) run run-steps) max-api-rate-throttler))
           sf-test-suites))
     true))
 
@@ -444,32 +422,32 @@
 (defn populate-sf-results [client {:keys [project-id testset-id] :as options} sf-test-suites]
   (log/infof "populating testset %s with results from %d suites" testset-id (count sf-test-suites))
   (when (or (:skip-validation? options)
-            (validate-testset client project-id testset-id sf-test-suites (:max-api-rate options)))
+            (validate-testset client project-id testset-id sf-test-suites (:max-api-rate-throttler options)))
     (doall
      (pmap (fn [test-suite]
              (let [test-name       (sf-test-suite->pt-test-name options test-suite)
-                   max-api-rate    (:max-api-rate options)
-                   test            (ll-find-test client project-id test-name max-api-rate)
-                   instance        (ll-find-instance client project-id testset-id (:id test) max-api-rate)
+                   max-api-rate-throttler    (:max-api-rate-throttler options)
+                   test            (ll-find-test client project-id test-name max-api-rate-throttler)
+                   instance        (ll-find-instance client project-id testset-id (:id test) max-api-rate-throttler)
                    [run run-steps] (sf-test-suite->run-def options test-suite)]
-               (ll-create-run client project-id (:id instance) run run-steps max-api-rate)))
+               (ll-create-run client project-id (:id instance) run run-steps max-api-rate-throttler)))
            sf-test-suites))
     true))
 
 (defn find-sf-testset [client project-id options]
-  (let [max-api-rate (:max-api-rate options)
-        testset (ll-find-testset client project-id (:testset-name options) max-api-rate)]
+  (let [max-api-rate-throttler (:max-api-rate-throttler options)
+        testset (ll-find-testset client project-id (:testset-name options) max-api-rate-throttler)]
     (when testset
       (update-sf-testset client options testset (read-string (:id testset))))))
 
 (defn create-or-update-sf-testset [client {:keys [project-id] :as options} sf-test-suites]
   (let [testset (or (find-sf-testset client project-id options)
                     (create-sf-testset client options sf-test-suites))
-        max-api-rate (:max-api-rate options)]
-    (let [instances (ll-testset-instances client project-id (:id testset) max-api-rate)
+        max-api-rate-throttler (:max-api-rate-throttler options)]
+    (let [instances (ll-testset-instances client project-id (:id testset) max-api-rate-throttler)
           tests     (pmap (fn [test-suite]
                             (let [test-name (sf-test-suite->pt-test-name options test-suite)]
-                              [test-name test-suite (ll-find-test client project-id test-name max-api-rate)]))
+                              [test-name test-suite (ll-find-test client project-id test-name max-api-rate-throttler)]))
                           sf-test-suites)
           nil-tests (filter #(nil? (last %)) tests)
           old-tests (filter #(not (nil? (last %))) tests)]
@@ -479,7 +457,7 @@
                                 (create-sf-test client options test-suite))
                               nil-tests)]
           (doall
-           (pmap #(ll-create-instance client project-id (:id testset) (:id %) max-api-rate) new-tests))))
+           (pmap #(ll-create-instance client project-id (:id testset) (:id %) max-api-rate-throttler) new-tests))))
       (when (seq old-tests)
         ;; update existing tests with new values
         (doall (map (fn [[_ test-suite test]]
@@ -489,5 +467,5 @@
       (let [missing-tests (difference (set (map #(read-string (:id (last %))) (remove #(nil? (last %)) tests)))
                                       (set (map #(get-in % [:attributes :test-id]) instances)))]
         (doall
-         (pmap #(ll-create-instance client project-id (:id testset) % max-api-rate) missing-tests)))
+         (pmap #(ll-create-instance client project-id (:id testset) % max-api-rate-throttler) missing-tests)))
       testset)))

@@ -9,8 +9,7 @@
    [practitest-firecracker.surefire   :refer [parse-reports-dir]]
    [test-xml-parser.core              :refer [send-directory]]
    [clojure.pprint                    :as    pprint]
-   [clojure.java.io                   :refer [file]]
-   )
+   [clojure.java.io                   :refer [file]])
   (:gen-class))
 
 (defn exit [status msg]
