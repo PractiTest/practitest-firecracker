@@ -5,7 +5,9 @@
    [clojure.walk                     :refer [postwalk]]
    [clj-http.client                  :as http]
    [clojure.tools.logging            :as log]
-   [practitest-firecracker.query-dsl :refer [query? eval-query]]))
+   [practitest-firecracker.query-dsl :refer [query? eval-query]]
+   [throttler.core                   :refer [throttle-chan throttle-fn]]
+   ))
 
 ;; ===========================================================================
 ;; api version
@@ -13,6 +15,10 @@
 
 ;; ===========================================================================
 ;; utils
+
+;; (def +# (throttle-fn + 100 :second))
+
+;; (+# 1 1)
 
 (def backoff-timeout "Backoff timeout in seconds" 20)
 (def run-batch-bucket-size 10)
