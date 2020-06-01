@@ -28,7 +28,7 @@
   (let [{:keys [action options exit-message ok?]} (parse-args args)]
     (if exit-message
       (exit (if ok? 0 1) exit-message)
-      (let [client  (make-client (select-keys options [:email :api-token :api-uri]))
+      (let [client  (make-client (select-keys options [:email :api-token :api-uri :max-api-rate]))
             reports (parse-reports-dir (:reports-path options))
             config  (parse-reports-dir (:reports-path options))
             directory (file (first (:reports-path options)))

@@ -5,12 +5,7 @@
    [clojure.walk                     :refer [postwalk]]
    [clojure.string                   :as string]
    [cheshire.core                    :as json]
-   [practitest-firecracker.query-dsl :refer [read-query]]
-   [throttler.core                   :refer [fn-throttler]]))
-
-(defn create-api-throttler [rate]
-  (let [fn-th (fn-throttler rate :minute)]
-    fn-th))
+   [practitest-firecracker.query-dsl :refer [read-query]]))
 
 (defn parse-additional-fields [v]
   (postwalk #(if (string? %) (read-query %) %)
@@ -99,8 +94,7 @@
 (defn parse-args [args]
   (let [{:keys [options arguments errors summary]} (parse-opts args cli-options)
         new-parsed-json  (when (not (= (:config-path options) nil)) (parse-config-file options))
-        options          (merge options new-parsed-json)
-        options          (assoc options :max-api-rate-throttler (create-api-throttler (:max-api-rate options)))]
+        options          (merge options new-parsed-json)]
     (cond
       (:help options)
       {:exit-message (usage summary) :ok? true}
