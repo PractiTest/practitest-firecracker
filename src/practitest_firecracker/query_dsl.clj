@@ -87,7 +87,9 @@
                        {:op   (compile-query op)
                         :args (vec (map compile-query args))})
                      query))]
-    (if (not (or (= java.lang.Long (type query)) (= java.lang.Double (type query))))
+    (if (not (or (= java.lang.Long (type query))
+                 (= java.lang.Double (type query))
+                 (and (= java.lang.String (type query)))))
       (with-meta (compiler query)
         {:query true})
       (compiler query))))
