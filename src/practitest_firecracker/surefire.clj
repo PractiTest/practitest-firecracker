@@ -46,7 +46,8 @@
    :failure-type    (.getFailureType test-case)
    :failure-message (.getFailureMessage test-case)
    :failure-detail  (.getFailureDetail test-case)
-   :raw test-case})
+   ;; :raw test-case
+   })
 
 (defn translate-test-suite [test-suite]
   {:name            (.getName test-suite)
@@ -58,7 +59,7 @@
    :skipped         (.getNumberOfSkipped test-suite)
    :flakes          (.getNumberOfFlakes test-suite)
    :tests           (.getNumberOfTests test-suite)
-   :raw test-suite
+   ;; :raw test-suite
    :test-cases      (map translate-test-case (.getTestCases test-suite))})
 
 ;; ===========================================================================

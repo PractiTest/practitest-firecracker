@@ -5,7 +5,12 @@
    [clojure.walk                     :refer [postwalk]]
    [clj-http.client                  :as http]
    [clojure.tools.logging            :as log]
-   [practitest-firecracker.query-dsl :refer [query? eval-query]]))
+   [practitest-firecracker.query-dsl :refer [query? eval-query]]
+   [throttler.core                   :refer [fn-throttler]]))
+
+;; ===========================================================================
+;; api version
+(def ^:const fc-version "1.4.0")
 
 ;; ===========================================================================
 ;; utils
@@ -15,6 +20,10 @@
 
 (def custom-field-cache (atom {}))
 
+(defn create-api-throttler [rate]
+  (let [fn-th (fn-throttler rate :minute)]
+    fn-th))
+
 (defn build-uri [base-uri resource-uri-template & params]
   (apply format (str base-uri resource-uri-template) params))
 
@@ -22,34 +31,34 @@
   (assert (not (and query-params form-params))
           "both `query-params` and `form-params` can't be specified")
   (loop [results []
-         uri     uri
-         params  (cond-> {:basic-auth credentials
-                          :throw-exceptions false
-                          :as :json}
-                   query-params (assoc :query-params query-params)
-                   form-params  (assoc :form-params form-params :content-type :json))]
-    (if (nil? uri)
-      results
-      (let [{:keys [status body]} (method uri params)]
-        (case status
-          504 (do
-                ;; load balancer freaking out, lets try again
-                (Thread/sleep 1000)
-                (recur results uri params))
-          429 (do
-                (log/warnf "API rate limit reached, waiting for %s seconds" backoff-timeout)
-                (Thread/sleep (* backoff-timeout 1000))
-                (recur results uri params))
-          200 (let [data (:data body)]
-                (recur (vec
-                        (if (sequential? data)
-                          (concat results data)
-                          (conj results data)))
-                       (get-in body [:links :next])
-                       (dissoc params :query-params)))
-          (throw (ex-info "API request failed" {:status status
-                                                :body   body
-                                                :uri    uri})))))))
+            uri     uri
+            params  (cond-> {:basic-auth          credentials
+                             :throw-exceptions    false
+                             :as                  :json}
+                      query-params (assoc :query-params (conj query-params {:source "firecracker" :firecracker-version fc-version}) )
+                      form-params  (assoc :form-params (conj form-params {:source "firecracker" :firecracker-version fc-version}) :content-type :json))]
+       (if (nil? uri)
+         results
+         (let [{:keys [status body]} (method uri params)]
+           (case status
+             504 (do
+                   ;; load balancer freaking out, lets try again
+                   (Thread/sleep 1000)
+                   (recur results uri params))
+             429 (do
+                   (log/warnf "API rate limit reached, waiting for %s seconds" backoff-timeout)
+                   (Thread/sleep (* backoff-timeout 1000))
+                   (recur results uri params))
+             200 (let [data (:data body)]
+                   (recur (vec
+                           (if (sequential? data)
+                             (concat results data)
+                             (conj results data)))
+                          (get-in body [:links :next])
+                          (dissoc params :query-params)))
+             (throw (ex-info "API request failed" {:status status
+                                                   :body   body
+                                                   :uri    uri})))))))
 
 ;; ===========================================================================
 ;; constants
@@ -71,154 +80,155 @@
 ;; ===========================================================================
 ;; API
 
-(defn make-client [{:keys [email api-token api-uri]}]
-  {:credentials [email api-token]
-   :base-uri    (str api-uri
-                     (if (string/ends-with? api-uri "/") "" "/")
-                     "api/v2")})
+(defn make-client [{:keys [email api-token api-uri max-api-rate]}]
+  {:credentials            [email api-token]
+   :base-uri               (str api-uri
+                                (if (string/ends-with? api-uri "/") "" "/")
+                                "api/v2")
+   :max-api-rate-throttler (create-api-throttler max-api-rate)})
 
-(defn ll-testset [{:keys [base-uri credentials]} project-id id]
+(defn ll-testset [{:keys [base-uri credentials max-api-rate-throttler]} project-id id]
   (let [uri (build-uri base-uri testset-uri project-id (if (string? id)
                                                          (Long/parseLong id)
                                                          id))]
     (first
-     (api-call {:credentials credentials
-                :uri         uri
-                :method      http/get}))))
+     (api-call {:credentials  credentials
+                :uri          uri
+                :method       (max-api-rate-throttler http/get)}))))
 
-(defn ll-testset-instances [{:keys [base-uri credentials]} project-id testset-id]
+(defn ll-testset-instances [{:keys [base-uri credentials max-api-rate-throttler]} project-id testset-id]
   (let [uri (build-uri base-uri testset-instances-uri project-id)]
     (api-call {:credentials  credentials
                :uri          uri
-               :method       http/get
+               :method       (max-api-rate-throttler http/get)
                :query-params {:set-ids testset-id}})))
 
-(defn ll-test [{:keys [base-uri credentials]} project-id id]
+(defn ll-test [{:keys [base-uri credentials max-api-rate-throttler]} project-id id]
   (let [uri (build-uri base-uri test-uri project-id id)]
     (first
-     (api-call {:credentials credentials
-                :uri         uri
-                :method      http/get}))))
+     (api-call {:credentials  credentials
+                :uri          uri
+                :method       (max-api-rate-throttler http/get)}))))
 
-(defn ll-test-steps [{:keys [base-uri credentials]} project-id test-id]
+(defn ll-test-steps [{:keys [base-uri credentials max-api-rate-throttler]} project-id test-id]
   (let [uri (build-uri base-uri test-steps-uri project-id)]
     (api-call {:credentials  credentials
                :uri          uri
-               :method       http/get
+               :method       (max-api-rate-throttler http/get)
                :query-params {:test-ids test-id}})))
 
-(defn ll-create-test [{:keys [base-uri credentials]} project-id attributes steps]
+(defn ll-create-test [{:keys [base-uri credentials max-api-rate-throttler]} project-id attributes steps]
   (let [uri (build-uri base-uri create-test-uri project-id)]
     (first
-     (api-call {:credentials credentials
-                :uri         uri
-                :method      http/post
-                :form-params {:data {:type       "tests"
-                                     :attributes attributes
-                                     :steps      {:data steps}}}}))))
+     (api-call {:credentials  credentials
+                :uri          uri
+                :method       (max-api-rate-throttler http/post)
+                :form-params  {:data {:type       "tests"
+                                      :attributes attributes
+                                      :steps      {:data steps}}}}))))
 
-(defn ll-create-testset [{:keys [base-uri credentials]} project-id attributes test-ids]
+(defn ll-create-testset [{:keys [base-uri credentials max-api-rate-throttler]} project-id attributes test-ids]
   (let [uri (build-uri base-uri create-testset-uri project-id)]
     (first
-     (api-call {:credentials credentials
-                :uri         uri
-                :method      http/post
-                :form-params {:data {:type       "sets"
-                                     :attributes attributes
-                                     :instances  {:test-ids test-ids}}}}))))
+     (api-call {:credentials  credentials
+                :uri          uri
+                :method       (max-api-rate-throttler http/post)
+                :form-params  {:data {:type       "sets"
+                                      :attributes attributes
+                                      :instances  {:test-ids test-ids}}}}))))
 
-(defn ll-create-instance [{:keys [base-uri credentials]} project-id testset-id test-id]
+(defn ll-create-instance [{:keys [base-uri credentials max-api-rate-throttler]} project-id testset-id test-id]
   ;; TODO: bulk-create instances (same set id, multiple test ids)
   (let [uri (build-uri base-uri create-instance-uri project-id)]
     (first
-     (api-call {:credentials credentials
-                :uri         uri
-                :method      http/post
-                :form-params {:data {:type       "instances"
-                                     :attributes {:set-id  testset-id
-                                                  :test-id test-id}}}}))))
+     (api-call {:credentials  credentials
+                :uri          uri
+                :method       (max-api-rate-throttler http/post)
+                :form-params  {:data {:type       "instances"
+                                      :attributes {:set-id  testset-id
+                                                   :test-id test-id}}}}))))
 
-(defn ll-create-run [{:keys [base-uri credentials]} project-id instance-id attributes steps]
+(defn ll-create-run [{:keys [base-uri credentials max-api-rate-throttler]} project-id instance-id attributes steps]
   (let [uri (build-uri base-uri create-run-uri project-id)]
     (first
-     (api-call {:credentials credentials
-                :uri         uri
-                :method      http/post
-                :form-params {:data {:type       "instances"
-                                     :attributes (assoc attributes :instance-id instance-id)
-                                     :steps      {:data steps}}}}))))
-
-(defn ll-create-runs [{:keys [base-uri credentials]} project-id runs]
-  (let [uri (build-uri base-uri create-run-uri project-id)]
-    (api-call {:credentials credentials
-               :uri         uri
-               :method      http/post
-               :form-params {:data (for [[instance-id attributes steps] runs]
-                                     {:type       "instances"
+     (api-call {:credentials  credentials
+                :uri          uri
+                :method       (max-api-rate-throttler http/post)
+                :form-params  {:data {:type       "instances"
                                       :attributes (assoc attributes :instance-id instance-id)
-                                      :steps      {:data steps}})}})))
+                                      :steps      {:data steps}}}}))))
 
-(defn ll-find-test [{:keys [base-uri credentials]} project-id name]
+(defn ll-create-runs [{:keys [base-uri credentials max-api-rate-throttler]} project-id runs]
+  (let [uri (build-uri base-uri create-run-uri project-id)]
+    (api-call {:credentials  credentials
+               :uri          uri
+               :method       (max-api-rate-throttler http/post)
+               :form-params  {:data (for [[instance-id attributes steps] runs]
+                                      {:type       "instances"
+                                       :attributes (assoc attributes :instance-id instance-id)
+                                       :steps      {:data steps}})}})))
+
+(defn ll-find-test [{:keys [base-uri credentials max-api-rate-throttler]} project-id name]
   (let [uri (build-uri base-uri list-tests-uri project-id)]
     ;; in case there are more than one test with this name, return the first one
     (first
      (api-call {:credentials  credentials
                 :uri          uri
-                :method       http/get
+                :method       (max-api-rate-throttler http/get)
                 :query-params {:name_exact name}}))))
 
-(defn ll-find-instance [{:keys [base-uri credentials]} project-id testset-id test-id]
+(defn ll-find-instance [{:keys [base-uri credentials max-api-rate-throttler]} project-id testset-id test-id]
   (let [uri (build-uri base-uri testset-instances-uri project-id)]
     (first
      (api-call {:credentials  credentials
                 :uri          uri
-                :method       http/get
+                :method       (max-api-rate-throttler http/get)
                 :query-params {:set-ids  testset-id
                                :test-ids test-id}}))))
 
-(defn ll-find-testset [{:keys [base-uri credentials]} project-id name]
+(defn ll-find-testset [{:keys [base-uri credentials max-api-rate-throttler]} project-id name]
   (let [uri (build-uri base-uri list-testsets-uri project-id)]
     (first
      (api-call {:credentials  credentials
                 :uri          uri
-                :method       http/get
+                :method       (max-api-rate-throttler http/get)
                 :query-params {:name_exact name}}))))
 
-(defn ll-get-custom-field [{:keys [base-uri credentials]} project-id cf-id]
+(defn ll-get-custom-field [{:keys [base-uri credentials max-api-rate-throttler]} project-id cf-id]
   (let [uri (build-uri base-uri custom-field-uri project-id cf-id)]
     (first
-     (api-call {:credentials credentials
-                :uri         uri
-                :method      http/get}))))
+     (api-call {:credentials  credentials
+                :uri          uri
+                :method       (max-api-rate-throttler http/get)}))))
 
-(defn ll-update-custom-field [{:keys [base-uri credentials]} project-id cf-id possible-values]
+(defn ll-update-custom-field [{:keys [base-uri credentials max-api-rate-throttler]} project-id cf-id possible-values]
   (let [uri (build-uri base-uri custom-field-uri project-id cf-id)]
     (first
-     (api-call {:credentials credentials
-                :uri         uri
-                :method      http/put
-                :form-params {:data {:type       "custom_field"
-                                     :attributes {:possible-values possible-values}}}}))))
+     (api-call {:credentials  credentials
+                :uri          uri
+                :method       (max-api-rate-throttler http/put)
+                :form-params  {:data {:type       "custom_field"
+                                      :attributes {:possible-values possible-values}}}}))))
 
-(defn ll-update-test [{:keys [base-uri credentials]} project-id attributes steps cf-id]
+(defn ll-update-test [{:keys [base-uri credentials max-api-rate-throttler]} project-id attributes steps cf-id]
   (let [uri (build-uri base-uri update-test-uri project-id cf-id)]
     (first
-     (api-call {:credentials credentials
-                :uri         uri
-                :method      http/put
-                :form-params {:data {:type       "tests"
-                                     :attributes attributes
-                                     :steps      {:data steps}}}}))))
+     (api-call {:credentials  credentials
+                :uri          uri
+                :method       (max-api-rate-throttler http/put)
+                :form-params  {:data {:type       "tests"
+                                      :attributes attributes
+                                      :steps      {:data steps}}}}))))
 
-(defn ll-update-testset [{:keys [base-uri credentials]} project-id attributes steps cf-id]
+(defn ll-update-testset [{:keys [base-uri credentials max-api-rate-throttler]} project-id attributes steps cf-id]
   (let [uri (build-uri base-uri update-testset-uri project-id cf-id)]
     (first
-     (api-call {:credentials credentials
-                :uri         uri
-                :method      http/put
-                :form-params {:data {:type       "sets"
-                                     :attributes attributes
-                                     :steps      {:data steps}}}}))))
+     (api-call {:credentials  credentials
+                :uri          uri
+                :method       (max-api-rate-throttler http/put)
+                :form-params  {:data {:type       "sets"
+                                      :attributes attributes
+                                      :steps      {:data steps}}}}))))
 
 (defn testset [client project-id id]
   (let [testset   (ll-testset client project-id id)
@@ -301,9 +311,10 @@
           (ll-update-custom-field client project-id cf-id (vec (conj possible-values v))))))))
 
 (defn create-sf-test [client {:keys [project-id] :as options} sf-test-suite]
-  (let [[test-def step-defs] (sf-test-suite->test-def options sf-test-suite)
-        test                 (ll-find-test client project-id (:name test-def))
-        additional-test-fields (eval-additional-fields sf-test-suite (:additional-test-fields options))]
+  (let [[test-def step-defs]   (sf-test-suite->test-def options sf-test-suite)
+        test                   (ll-find-test client project-id (:name test-def))
+        additional-test-fields (eval-additional-fields sf-test-suite (:additional-test-fields options))
+        additional-test-fields (merge additional-test-fields (:system-fields additional-test-fields))]
     (ensure-custom-field-values client project-id (:custom-fields additional-test-fields))
     (if test
       test
@@ -315,8 +326,9 @@
                       step-defs))))
 
 (defn update-sf-test [client {:keys [project-id] :as options} sf-test-suite test-id]
-  (let [[test-def step-defs] (sf-test-suite->test-def options sf-test-suite)
-        additional-test-fields (eval-additional-fields sf-test-suite (:additional-test-fields options))]
+  (let [[test-def step-defs]   (sf-test-suite->test-def options sf-test-suite)
+        additional-test-fields (eval-additional-fields sf-test-suite (:additional-test-fields options))
+        additional-test-fields (merge additional-test-fields (:system-fields additional-test-fields))]
     (ensure-custom-field-values client project-id (:custom-fields additional-test-fields))
     (ll-update-test client
                     project-id
@@ -327,14 +339,16 @@
                     test-id)))
 
 (defn update-sf-testset [client {:keys [project-id] :as options} sf-test-suite testset-id]
-  (let [[test-def step-defs] (sf-test-suite->test-def options sf-test-suite)]
-    (ensure-custom-field-values client project-id (:custom-fields (:additional-testset-fields options)))
+  (let [[test-def step-defs]       (sf-test-suite->test-def options sf-test-suite)
+        additional-testset-fields  (:additional-testset-fields options)
+        additional-testset-fields  (merge additional-testset-fields (:system-fields additional-testset-fields))]
+    (ensure-custom-field-values client project-id (:custom-fields additional-testset-fields))
     (ll-update-testset client
                     project-id
                     (merge test-def
                            {:name (:testset-name options)}
                            {:author-id (:author-id options)}
-                           (:additional-testset-fields options))
+                           additional-testset-fields)
                     step-defs
                     testset-id)))
 
@@ -343,11 +357,13 @@
     (ll-create-testset client project-id (merge {:name sf-name} additional-testset-fields) (map :id tests))))
 
 (defn create-sf-testset [client options sf-test-suites]
-  (let [tests (map (partial create-sf-test client options) sf-test-suites)]
+  (let [tests                      (map (partial create-sf-test client options) sf-test-suites)
+        additional-testset-fields  (:additional-testset-fields options)
+        additional-testset-fields  (merge additional-testset-fields (:system-fields additional-testset-fields))]
     (ll-create-testset client
                        (:project-id options)
                        (merge {:name (:testset-name options)}
-                              (:additional-testset-fields options))
+                              additional-testset-fields)
                        (map :id tests))))
 
 (defn sf-test-case->run-step-def-old [test-case]

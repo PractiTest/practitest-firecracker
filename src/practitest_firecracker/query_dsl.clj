@@ -76,17 +76,8 @@
              (contains? test-suite key))      (key test-suite)
         (and (not (= test-case nil))
              (contains? test-case key))       (key test-case)
-        (string/starts-with? (str query) "?") (throw
-                                               (ex-info (format "Syntax error: unsupported variable '%s'" query)
-                                                        {:query query
-                                                         :key key
-                                                         :test-suite test-suite
-                                                         :test-case test-case}))
-        :else                                 (str query)
-        ;; (number? query)                       (str query)
-        ;; :else (str "else: " query " key: " key)
-        ;;:else (str "else: " query " key: " key)
-        ))))
+        (string/starts-with? (str query) "?") (str "")
+        :else                                 (str query)))))
 
 (defn read-query [s]
   (let [query    (edn/read-string s)
@@ -96,8 +87,12 @@
                        {:op   (compile-query op)
                         :args (vec (map compile-query args))})
                      query))]
-    (with-meta (compiler query)
-      {:query true})))
+    (if (not (or (= java.lang.Long (type query))
+                 (= java.lang.Double (type query))
+                 (and (= java.lang.String (type query)))))
+      (with-meta (compiler query)
+        {:query true})
+      (compiler query))))
 
 (defn query? [obj]
   (boolean (:query (meta obj))))
