@@ -51,10 +51,9 @@
 
           "populate-testset"
           (do
-            (populate-sf-results-old client
-                                     (:project-id options)
-                                     (:testset-id options)
-                                     additional-reports)
+            (populate-sf-results client
+                                 options
+                                 additional-reports)
             (exit 0 "Done"))
 
           "create-and-populate-testset"
