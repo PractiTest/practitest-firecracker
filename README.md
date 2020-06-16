@@ -9,7 +9,7 @@ To login you can use your PractiTest credentials, follow the instructions in the
 
 ### help
 
-At evrey point you can run:
+At every point you can run:
 
 ``` shell
 java -jar practitest-firecracker-standalone.jar help
@@ -33,7 +33,7 @@ The call above will analyze the surefire reports and create tests and testset. I
 
 You can set various custom fields for tests when they are created (especially useful if you have mandatory fields configured in your tests).
 
-Those configuration are set in config file to edit the config file go to https://firecracker-ui-prod.practitest.com/ and then use the example above again with the new generated config file.
+To set custom fields you will need to create configuration file in here https://firecracker-ui-prod.practitest.com/ after that you can use it to run the command line above with it (CONFIG_FILE).
 
 ### populate-testset
 Populate the testset from reports folder:
