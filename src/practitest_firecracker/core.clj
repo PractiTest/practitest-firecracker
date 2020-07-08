@@ -30,13 +30,15 @@
       (exit (if ok? 0 1) exit-message)
       (let [client  (make-client (select-keys options [:email :api-token :api-uri :max-api-rate]))
             reports (parse-reports-dir (:reports-path options))
-            config  (parse-reports-dir (:reports-path options))
+            ;; config  (parse-reports-dir (:reports-path options))
             directory (file (first (:reports-path options)))
-            additional-config  (send-directory directory config)
+            ;; additional-config  (send-directory directory config)
             additional-reports (send-directory directory reports)]
         (case action
           "display-config"
           (let [result (send-directory directory reports)]
+            ;; (pprint/pprint {"=============== additional-config: ===============" additional-config})
+            (pprint/pprint {"=============== additional-reports: ===============" additional-reports})
             (pprint/pprint {"=============== FC original reports val: ===============" reports})
             (pprint/pprint {"=============== FC result: ===============" result}))
 
@@ -69,5 +71,5 @@
                                   additional-reports))
             (exit 0 (format "Populated TestSet ID: %s" (:id testset))))
           "test"
-          (let [testset (create-or-update-sf-testset client options additional-reports additional-config)]
+          (let [testset (create-or-update-sf-testset client options additional-reports additional-reports)]
             (exit 0 (format "TestSet ID: %s" (:id testset)))))))))
