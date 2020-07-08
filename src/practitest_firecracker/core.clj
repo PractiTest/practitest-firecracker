@@ -7,7 +7,7 @@
                                               populate-sf-results
                                               create-or-update-sf-testset]]
    [practitest-firecracker.surefire   :refer [parse-reports-dir]]
-   [test-xml-parser.core              :refer [send-directory]]
+   [test-xml-parser.core              :refer [send-directory remove-BOM]]
    [clojure.pprint                    :as    pprint]
    [clojure.java.io                   :refer [file]])
   (:gen-class))
@@ -29,6 +29,7 @@
     (if exit-message
       (exit (if ok? 0 1) exit-message)
       (let [client  (make-client (select-keys options [:email :api-token :api-uri :max-api-rate]))
+            ;; val     (fix-BOM (file (first (:reports-path options))))
             reports (parse-reports-dir (:reports-path options))
             ;; config  (parse-reports-dir (:reports-path options))
             directory (file (first (:reports-path options)))
@@ -37,6 +38,8 @@
         (case action
           "display-config"
           (let [result (send-directory directory reports)]
+            (pprint/pprint "value:")
+            (pprint/pprint val)
             ;; (pprint/pprint {"=============== additional-config: ===============" additional-config})
             (pprint/pprint {"=============== additional-reports: ===============" additional-reports})
             (pprint/pprint {"=============== FC original reports val: ===============" reports})
