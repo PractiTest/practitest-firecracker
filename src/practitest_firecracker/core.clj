@@ -29,17 +29,16 @@
     (if exit-message
       (exit (if ok? 0 1) exit-message)
       (do
-        (remove-bom (file (first (:reports-path options))))
+        (doall (map remove-bom (:reports-path options)))
         (let [client             (make-client (select-keys options [:email :api-token :api-uri :max-api-rate]))
-              reports            (parse-reports-dir (:reports-path options))
-              directory          (file (first (:reports-path options)))
-              additional-reports (send-directory directory reports)]
+              reports            (parse-reports-dir (map #(str % "/tmp") (:reports-path options)))
+              directory          (:reports-path options)
+              additional-reports (doall (map send-directory directory reports))]
           (case action
             "display-config"
-            (let [result (send-directory directory reports)]
+            (do
               (pprint/pprint {"=============== additional-reports: ===============" additional-reports})
-              (pprint/pprint {"=============== FC original reports val: ===============" reports})
-              (pprint/pprint {"=============== FC result: ===============" result}))
+              (pprint/pprint {"=============== FC original reports val: ===============" reports}))
 
             "display-options"
             (do
