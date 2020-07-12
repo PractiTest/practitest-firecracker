@@ -33,7 +33,7 @@
         (let [client             (make-client (select-keys options [:email :api-token :api-uri :max-api-rate]))
               reports            (parse-reports-dir (map #(str % "/tmp") (:reports-path options)))
               directory          (:reports-path options)
-              additional-reports (doall (map send-directory directory reports))]
+              additional-reports (map send-directory directory reports)]
           (case action
             "display-config"
             (do
