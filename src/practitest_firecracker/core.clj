@@ -8,8 +8,9 @@
                                               create-or-update-sf-testset]]
    [practitest-firecracker.surefire   :refer [parse-reports-dir]]
    [test-xml-parser.core              :refer [send-directory remove-bom return-files]]
-   [clojure.pprint                    :as    pprint]
-   [clojure.java.io                   :refer [file]])
+   [clojure.pprint                    :as     pprint]
+   [clojure.java.io                   :refer [file]]
+   [clojure.string                    :refer [includes?]])
   (:gen-class))
 
 (defn exit [status msg]
@@ -29,9 +30,12 @@
     (if exit-message
       (exit (if ok? 0 1) exit-message)
       (do
-        (doall (map remove-bom (:reports-path options)))
+        (doseq [report-path (:reports-path options)]
+          (remove-bom report-path))
         (let [client             (make-client (select-keys options [:email :api-token :api-uri :max-api-rate]))
-              reports            (parse-reports-dir (map #(str % "/tmp") (:reports-path options)))
+              full-path          (.getAbsolutePath (file (first (:reports-path options))))
+              seperator          (if (includes? full-path "/") "/" "\\")
+              reports            (parse-reports-dir (map #(str "tmp" seperator %) (:reports-path options)))
               directory          (:reports-path options)
               additional-reports (reduce merge (map send-directory directory reports))]
           (case action
