@@ -38,12 +38,23 @@
         (let [client             (make-client (select-keys options [:email :api-token :api-uri :max-api-rate]))
               directory          (map #(.getAbsolutePath (file "tmp" %)) (:reports-path options))
               reports            (parse-reports-dir directory)
-              additional-reports (reduce merge (map send-directory directory reports))]
+              additional-reports1 (send-directory (first directory) reports)
+              additional-reports2 (send-directory (last directory) reports)
+              report-result       (list )
+              additional-reports  (first
+                                   (conj report-result
+                                         (first
+                                          (for [dir directory]
+                                            (send-directory dir reports)))))
+              ]
           (case action
             "display-config"
             (do
+              (pprint/pprint {"=============== additional-reports1: ===============" additional-reports1})
+              (pprint/pprint {"=============== additional-reports2: ===============" additional-reports2})
               (pprint/pprint {"=============== additional-reports: ===============" additional-reports})
               (pprint/pprint {"=============== FC original reports val: ===============" reports})
+              ;; (pprint/pprint {"=============== directory: ===============" directory})
               (clean-tmp-folder directory))
 
             "display-options"
