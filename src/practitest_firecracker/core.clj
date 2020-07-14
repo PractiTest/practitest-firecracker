@@ -49,7 +49,6 @@
             (do
               (pprint/pprint {"=============== additional-reports: ===============" additional-reports})
               (pprint/pprint {"=============== FC original reports val: ===============" reports})
-              ;; (pprint/pprint {"=============== directory: ===============" directory})
               (clean-tmp-folder directory))
 
             "display-options"
