@@ -7,7 +7,7 @@
                                               populate-sf-results
                                               create-or-update-sf-testset]]
    [practitest-firecracker.surefire   :refer [parse-reports-dir]]
-   [test-xml-parser.core              :refer [send-directory remove-bom return-files]]
+   [test-xml-parser.core              :refer [send-directory remove-bom return-files delete-recursively]]
    [clojure.pprint                    :as     pprint]
    [clojure.java.io                   :refer [file]]
    [clojure.string                    :refer [includes?]])
@@ -74,4 +74,5 @@
               (exit 0 (format "Populated TestSet ID: %s" (:id testset))))
             "test"
             (let [testset (create-or-update-sf-testset client options additional-reports additional-reports)]
-              (exit 0 (format "TestSet ID: %s" (:id testset))))))))))
+              (exit 0 (format "TestSet ID: %s" (:id testset)))))
+          (delete-recursively "tmp"))))))
