@@ -25,6 +25,10 @@
        (println (str ~module " elapsed time: " (/ (double (- (. System (nanoTime)) start#)) 1000000.0) " msecs")))
      ret#))
 
+(defn clean-tmp-folder [directory]
+  (doseq [path directory]
+    (delete-recursively (file path))))
+
 (defn -main [& args]
   (let [{:keys [action options exit-message ok?]} (parse-args args)]
     (if exit-message
@@ -42,15 +46,18 @@
             "display-config"
             (do
               (pprint/pprint {"=============== additional-reports: ===============" additional-reports})
-              (pprint/pprint {"=============== FC original reports val: ===============" reports}))
+              (pprint/pprint {"=============== FC original reports val: ===============" reports})
+              (clean-tmp-folder directory))
 
             "display-options"
             (do
               (pprint/pprint {"=============== options: ===============" options})
-              (pprint/pprint {"=============== args: ===============" args}))
+              (pprint/pprint {"=============== args: ===============" args})
+              (clean-tmp-folder directory))
 
             "create-testset"
             (let [testset (create-or-update-sf-testset client options additional-reports)]
+              (clean-tmp-folder directory)
               (exit 0 (format "TestSet ID: %s" (:id testset))))
 
             "populate-testset"
@@ -58,6 +65,7 @@
               (populate-sf-results client
                                    options
                                    additional-reports)
+              (clean-tmp-folder directory)
               (exit 0 "Done"))
 
             "create-and-populate-testset"
@@ -71,8 +79,10 @@
                                            :skip-validation? true
                                            :testset-id       (:id testset))
                                     additional-reports))
+              (clean-tmp-folder directory)
               (exit 0 (format "Populated TestSet ID: %s" (:id testset))))
             "test"
             (let [testset (create-or-update-sf-testset client options additional-reports additional-reports)]
+              (clean-tmp-folder directory)
               (exit 0 (format "TestSet ID: %s" (:id testset)))))
-          (delete-recursively (file "tmp")))))))
+          )))))
