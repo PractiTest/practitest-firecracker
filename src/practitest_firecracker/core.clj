@@ -35,8 +35,8 @@
         (let [client             (make-client (select-keys options [:email :api-token :api-uri :max-api-rate]))
               full-path          (.getAbsolutePath (file (first (:reports-path options))))
               seperator          (if (includes? full-path "/") "/" "\\")
-              reports            (parse-reports-dir (map #(str "tmp" seperator %) (:reports-path options)))
-              directory          (:reports-path options)
+              directory          (map #(str "tmp" seperator %) (:reports-path options))
+              reports            (parse-reports-dir directory)
               additional-reports (reduce merge (map send-directory directory reports))]
           (case action
             "display-config"

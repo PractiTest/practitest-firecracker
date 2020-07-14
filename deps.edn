@@ -8,7 +8,7 @@
          org.apache.maven.surefire/surefire-report-parser {:mvn/version "2.22.2"}
          org.clojure/tools.logging                        {:mvn/version "1.1.0"}
          ch.qos.logback/logback-classic                   {:mvn/version "1.2.3"}
-         github-PractiTest/test-xml-parser                {:git/url "git@github.com:PractiTest/test-xml-parser.git" :deps/manifest :deps :sha "6b5ad41fd50c2cb99f4b0c2871c1be256112f156"}
+         github-PractiTest/test-xml-parser                {:git/url "git@github.com:PractiTest/test-xml-parser.git" :deps/manifest :deps :sha "c4dbefb5c374ec00c76270a91ec3fda68eaabd2b"}
          }
  :aliases
  {:dev       {:extra-paths ["dev"]}
