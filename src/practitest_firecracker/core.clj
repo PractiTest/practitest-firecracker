@@ -75,4 +75,4 @@
             "test"
             (let [testset (create-or-update-sf-testset client options additional-reports additional-reports)]
               (exit 0 (format "TestSet ID: %s" (:id testset)))))
-          (delete-recursively "tmp"))))))
+          (delete-recursively (file "tmp")))))))
