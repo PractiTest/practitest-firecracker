@@ -7,10 +7,9 @@
                                               populate-sf-results
                                               create-or-update-sf-testset]]
    [practitest-firecracker.surefire   :refer [parse-reports-dir]]
-   [test-xml-parser.core              :refer [send-directory remove-bom return-files delete-recursively]]
+   [test-xml-parser.core              :refer [send-directory remove-bom return-files delete-recursively!]]
    [clojure.pprint                    :as     pprint]
-   [clojure.java.io                   :refer [file]]
-   [clojure.string                    :refer [includes?]])
+   [clojure.java.io                   :refer [file]])
   (:gen-class))
 
 (defn exit [status msg]
@@ -27,7 +26,7 @@
 
 (defn clean-tmp-folder [directory]
   (doseq [path directory]
-    (delete-recursively (file path))))
+    (delete-recursively! path)))
 
 (defn -main [& args]
   (let [{:keys [action options exit-message ok?]} (parse-args args)]
@@ -37,9 +36,7 @@
         (doseq [report-path (:reports-path options)]
           (remove-bom report-path))
         (let [client             (make-client (select-keys options [:email :api-token :api-uri :max-api-rate]))
-              full-path          (.getAbsolutePath (file (first (:reports-path options))))
-              seperator          (if (includes? full-path "/") "/" "\\")
-              directory          (map #(str "tmp" seperator %) (:reports-path options))
+              directory          (map #(.getAbsolutePath (file "tmp" %)) (:reports-path options))
               reports            (parse-reports-dir directory)
               additional-reports (reduce merge (map send-directory directory reports))]
           (case action
