@@ -38,12 +38,7 @@
         (let [client             (make-client (select-keys options [:email :api-token :api-uri :max-api-rate]))
               directory          (map #(.getAbsolutePath (file "tmp" %)) (:reports-path options))
               reports            (parse-reports-dir directory)
-              report-result       (list )
-              additional-reports  (first
-                                   (conj report-result
-                                         (first
-                                          (for [dir directory]
-                                            (send-directory dir reports)))))]
+              additional-reports (send-directory directory reports)]
           (case action
             "display-config"
             (do
