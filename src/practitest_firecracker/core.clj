@@ -34,9 +34,9 @@
       (exit (if ok? 0 1) exit-message)
       (do
         (doseq [report-path (:reports-path options)]
-          (remove-bom report-path))
+          (remove-bom report-path (:temp-folder options)))
         (let [client             (make-client (select-keys options [:email :api-token :api-uri :max-api-rate]))
-              directory          (map #(.getAbsolutePath (file "tmp" %)) (:reports-path options))
+              directory          (map #(.getAbsolutePath (file (:temp-folder options) %)) (:reports-path options))
               reports            (parse-reports-dir directory)
               additional-reports (send-directory directory reports)]
           (case action
