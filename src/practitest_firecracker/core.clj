@@ -7,8 +7,8 @@
                                               populate-sf-results
                                               create-or-update-sf-testset]]
    [practitest-firecracker.surefire   :refer [parse-reports-dir]]
-   [test-xml-parser.core              :refer [send-directory remove-bom return-files]]
-   [clojure.pprint                    :as    pprint]
+   [test-xml-parser.core              :refer [send-directory remove-bom return-files delete-recursively!]]
+   [clojure.pprint                    :as     pprint]
    [clojure.java.io                   :refer [file]])
   (:gen-class))
 
@@ -24,30 +24,37 @@
        (println (str ~module " elapsed time: " (/ (double (- (. System (nanoTime)) start#)) 1000000.0) " msecs")))
      ret#))
 
+(defn clean-tmp-folder [directory]
+  (doseq [path directory]
+    (delete-recursively! path)))
+
 (defn -main [& args]
   (let [{:keys [action options exit-message ok?]} (parse-args args)]
     (if exit-message
       (exit (if ok? 0 1) exit-message)
       (do
-        (remove-bom (file (first (:reports-path options))))
+        (doseq [report-path (:reports-path options)]
+          (remove-bom report-path (:temp-folder options)))
         (let [client             (make-client (select-keys options [:email :api-token :api-uri :max-api-rate]))
-              reports            (parse-reports-dir (:reports-path options))
-              directory          (file (first (:reports-path options)))
+              directory          (map #(.getAbsolutePath (file (:temp-folder options) %)) (:reports-path options))
+              reports            (parse-reports-dir directory)
               additional-reports (send-directory directory reports)]
           (case action
             "display-config"
-            (let [result (send-directory directory reports)]
+            (do
               (pprint/pprint {"=============== additional-reports: ===============" additional-reports})
               (pprint/pprint {"=============== FC original reports val: ===============" reports})
-              (pprint/pprint {"=============== FC result: ===============" result}))
+              (clean-tmp-folder directory))
 
             "display-options"
             (do
               (pprint/pprint {"=============== options: ===============" options})
-              (pprint/pprint {"=============== args: ===============" args}))
+              (pprint/pprint {"=============== args: ===============" args})
+              (clean-tmp-folder directory))
 
             "create-testset"
             (let [testset (create-or-update-sf-testset client options additional-reports)]
+              (clean-tmp-folder directory)
               (exit 0 (format "TestSet ID: %s" (:id testset))))
 
             "populate-testset"
@@ -55,6 +62,7 @@
               (populate-sf-results client
                                    options
                                    additional-reports)
+              (clean-tmp-folder directory)
               (exit 0 "Done"))
 
             "create-and-populate-testset"
@@ -68,7 +76,10 @@
                                            :skip-validation? true
                                            :testset-id       (:id testset))
                                     additional-reports))
+              (clean-tmp-folder directory)
               (exit 0 (format "Populated TestSet ID: %s" (:id testset))))
             "test"
             (let [testset (create-or-update-sf-testset client options additional-reports additional-reports)]
-              (exit 0 (format "TestSet ID: %s" (:id testset))))))))))
+              (clean-tmp-folder directory)
+              (exit 0 (format "TestSet ID: %s" (:id testset)))))
+          )))))
