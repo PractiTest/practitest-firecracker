@@ -10,7 +10,8 @@
 
 ;; ===========================================================================
 ;; api version
-(def ^:const fc-version "1.1.3")
+
+(def ^:const fc-version "1.1.2")
 
 ;; ===========================================================================
 ;; utils
@@ -381,7 +382,7 @@
   ;; otherwise -- go on
   (let [instances (ll-testset-instances client project-id testset-id)
         tests     (map (fn [test-suite]
-                         (let [name (str (:package-name test-suite) ":" (:name test-suite))]
+                         (let [name (:name test-suite)]
                            [name (ll-find-test client project-id name)]))
                        sf-test-suites)
         nil-tests (filter #(nil? (last %)) tests)]
