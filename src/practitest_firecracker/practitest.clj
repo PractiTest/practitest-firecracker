@@ -27,18 +27,23 @@
 (defn build-uri [base-uri resource-uri-template & params]
   (apply format (str base-uri resource-uri-template) params))
 
+(defn throw-api-exception [ex-info status body uri]
+  (throw (ex-info "API request failed" {:status status
+                                        :body   body
+                                        :uri    uri})))
+
 (defn api-call [{:keys [credentials uri method query-params form-params]}]
   (assert (not (and query-params form-params))
           "both `query-params` and `form-params` can't be specified")
   (loop [results  []
          uri      uri
-         attempts 11
+         attempts 10
          params   (cond-> {:basic-auth          credentials
                            :throw-exceptions    false
                            :as                  :json}
                     query-params (assoc :query-params (conj query-params {:source "firecracker" :firecracker-version fc-version}) )
                     form-params  (assoc :form-params (conj form-params {:source "firecracker" :firecracker-version fc-version}) :content-type :json))]
-    (if (and (nil? uri) (> attempts 0))
+    (if (nil? uri)
          results
          (let [{:keys [status body]} (method uri params)]
            (case status
@@ -46,13 +51,25 @@
                    ;; load balancer freaking out, lets try again
                    (Thread/sleep 1000)
                    (recur results uri (dec attempts) params))
-             502 (do
-                   ;; 502 Bad Gateway Error, lets try again
-                   (Thread/sleep 1000)
-                   (recur results uri (dec attempts) params))
-             503 (do
-                   ;; 503 Service Unavailable, lets try again
-                   (Thread/sleep 1000)
+             502 (if (> attempts 0)
+                   (do
+                     ;; 502 Bad Gateway Error, lets try again
+                     (log/warnf "%s responded with 502 - %s more attempts" uri attempts)
+                     (Thread/sleep 10)
+                     (recur results uri (dec attempts) params))
+                   (throw-api-exception ex-info status body uri))
+             500 (if (> attempts 0)
+                   (do
+                     ;; 500 Bad Gateway Error, lets try again
+                     (log/warnf "%s responded with 500 - %s more attempts" uri attempts)
+                     (Thread/sleep 10)
+                     (recur results uri (dec attempts) params))
+                   (throw-api-exception ex-info status body uri))
+             503 (if (> attempts 0)
+                   (do
+                     ;; 503 Service Unavailable, lets try again
+                     (log/warnf "%s responded with 503  - %s more attempts" uri attempts)
+                     (Thread/sleep 10))
                    (recur results uri (dec attempts) params))
              429 (do
                    (log/warnf "API rate limit reached, waiting for %s seconds" backoff-timeout)
@@ -66,9 +83,7 @@
                           (get-in body [:links :next])
                           (dec attempts)
                           (dissoc params :query-params)))
-             (throw (ex-info "API request failed" {:status status
-                                                   :body   body
-                                                   :uri    uri})))))))
+             (throw-api-exception ex-info status body uri))))))
 
 ;; ===========================================================================
 ;; constants
