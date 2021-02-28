@@ -16,7 +16,7 @@
 ;; utils
 
 (def backoff-timeout "Backoff timeout in seconds" 20)
-(def num-attemps "Number of attempts to run" 10)
+(def max-attempts "Number of attempts to run" 10)
 (def timeout-between-attempts "Timeout in seconds between attempts" 1)
 (def run-batch-bucket-size 10)
 
@@ -39,7 +39,7 @@
           "both `query-params` and `form-params` can't be specified")
   (loop [results  []
          uri      uri
-         attempts num-attemps
+         attempts max-attempts
          params   (cond-> {:basic-auth          credentials
                            :throw-exceptions    false
                            :as                  :json}
