@@ -16,6 +16,8 @@
 ;; utils
 
 (def backoff-timeout "Backoff timeout in seconds" 20)
+(def num-attemps "Number of attempts to run" 10)
+(def timeout-between-attempts "Timeout in seconds between attempts" 1)
 (def run-batch-bucket-size 10)
 
 (def custom-field-cache (atom {}))
@@ -37,53 +39,50 @@
           "both `query-params` and `form-params` can't be specified")
   (loop [results  []
          uri      uri
-         attempts 10
+         attempts num-attemps
          params   (cond-> {:basic-auth          credentials
                            :throw-exceptions    false
                            :as                  :json}
                     query-params (assoc :query-params (conj query-params {:source "firecracker" :firecracker-version fc-version}) )
                     form-params  (assoc :form-params (conj form-params {:source "firecracker" :firecracker-version fc-version}) :content-type :json))]
     (if (nil? uri)
-         results
-         (let [{:keys [status body]} (method uri params)]
-           (case status
-             504 (do
-                   ;; load balancer freaking out, lets try again
-                   (Thread/sleep 1000)
-                   (recur results uri (dec attempts) params))
-             502 (if (> attempts 0)
-                   (do
-                     ;; 502 Bad Gateway Error, lets try again
-                     (log/warnf "%s responded with 502 - %s more attempts" uri attempts)
-                     (Thread/sleep 10)
-                     (recur results uri (dec attempts) params))
-                   (throw-api-exception ex-info status body uri))
-             500 (if (> attempts 0)
-                   (do
-                     ;; 500 Bad Gateway Error, lets try again
-                     (log/warnf "%s responded with 500 - %s more attempts" uri attempts)
-                     (Thread/sleep 10)
-                     (recur results uri (dec attempts) params))
-                   (throw-api-exception ex-info status body uri))
-             503 (if (> attempts 0)
-                   (do
-                     ;; 503 Service Unavailable, lets try again
-                     (log/warnf "%s responded with 503  - %s more attempts" uri attempts)
-                     (Thread/sleep 10))
-                   (recur results uri (dec attempts) params))
-             429 (do
-                   (log/warnf "API rate limit reached, waiting for %s seconds" backoff-timeout)
-                   (Thread/sleep (* backoff-timeout 1000))
-                   (recur results (dec attempts) uri params))
-             200 (let [data (:data body)]
-                   (recur (vec
-                           (if (sequential? data)
-                             (concat results data)
-                             (conj results data)))
-                          (get-in body [:links :next])
-                          (dec attempts)
-                          (dissoc params :query-params)))
-             (throw-api-exception ex-info status body uri))))))
+      results
+      (let [{:keys [status body]} (method uri params)]
+        (if (> attempts 0)
+          (case status
+            504 (do
+                  ;; load balancer freaking out, lets try again
+                  (Thread/sleep (* timeout-between-attempts 1000))
+                  (recur results uri (dec attempts) params))
+            502 (do
+                  ;; 502 Bad Gateway Error, lets try again
+                  (log/warnf "%s responded with 502 - %s more attempts" uri attempts)
+                  (Thread/sleep (* timeout-between-attempts 1000))
+                  (recur results uri (dec attempts) params))
+            500 (do
+                  ;; 500 Bad Gateway Error, lets try again
+                  (log/warnf "%s responded with 500 - %s more attempts" uri attempts)
+                  (Thread/sleep (* timeout-between-attempts 1000))
+                  (recur results uri (dec attempts) params))
+            503 (do
+                  ;; 503 Service Unavailable, lets try again
+                  (log/warnf "%s responded with 503  - %s more attempts" uri attempts)
+                  (Thread/sleep (* timeout-between-attempts 1000))
+                  (recur results uri (dec attempts) params))
+            429 (do
+                  (log/warnf "API rate limit reached, waiting for %s seconds" backoff-timeout)
+                  (Thread/sleep (* backoff-timeout 1000))
+                  (recur results (dec attempts) uri params))
+            200 (let [data (:data body)]
+                  (recur (vec
+                          (if (sequential? data)
+                            (concat results data)
+                            (conj results data)))
+                         (get-in body [:links :next])
+                         attempts
+                         (dissoc params :query-params)))
+            (throw-api-exception ex-info status body uri))
+          (throw-api-exception ex-info status body uri))))))
 
 ;; ===========================================================================
 ;; constants
