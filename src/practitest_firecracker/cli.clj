@@ -23,6 +23,9 @@
                "Directory doesn't exist"]
     :assoc-fn (fn [m k v]
                 (reduce #(update %1 k conj %2) m v))]
+   [nil "--temp-folder PATH"
+    "Folder to contain parsed xmls, for each reports-path folder."
+    :default "tmp"]
    [nil "--config-path PATH"
     "Path to firecracker configuration file"
     :validate [(fn [paths]
