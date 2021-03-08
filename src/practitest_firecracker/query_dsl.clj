@@ -43,8 +43,10 @@
                                (throw
                                 (ex-info "Syntax error: 'take' must have two arguments"
                                          {:query query})))
-        'take-last           (if (= 2 (count args) 2)
-                               (take-last (parse-int (first args)) (last args))
+        'take-last           (if (<= 1 (count args))
+                               (if (= 2 (count args))
+                                 (take-last (parse-int (first args)) (last args))
+                                 (take-last 1 (last args)))
                                (throw
                                 (ex-info "Syntax error: 'take-last' must have one or two arguments"
                                          {:query query})))
