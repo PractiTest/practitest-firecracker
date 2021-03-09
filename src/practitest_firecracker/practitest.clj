@@ -362,7 +362,7 @@
                     step-defs
                     test-id)))
 
-(defn update-sf-testset [client {:keys [project-id] :as options} sf-test-suite testset-id]
+(defn update-sf-testset [client {:keys [project-id] :as options} testset-name sf-test-suite testset-id]
   (let [[test-def step-defs]       (sf-test-suite->test-def options sf-test-suite)
         additional-testset-fields  (:additional-testset-fields options)
         additional-testset-fields  (merge additional-testset-fields (:system-fields additional-testset-fields))]
@@ -370,7 +370,7 @@
     (ll-update-testset client
                     project-id
                     (merge test-def
-                           {:name (:testset-name options)}
+                           {:name testset-name}
                            {:author-id (:author-id options)}
                            additional-testset-fields)
                     step-defs
@@ -455,13 +455,13 @@
            sf-test-suites))
     true))
 
-(defn find-sf-testset [client project-id options]
-  (let [testset (ll-find-testset client project-id (:testset-name options))]
+(defn find-sf-testset [client project-id options testset-name]
+  (let [testset (ll-find-testset client project-id testset-name)]
     (when testset
-      (update-sf-testset client options testset (read-string (:id testset))))))
+      (update-sf-testset client options testset-name testset (read-string (:id testset))))))
 
 (defn create-or-update-sf-testset [client {:keys [project-id] :as options} sf-test-suites]
-  (let [testset (or (find-sf-testset client project-id options)
+  (let [testset (or (find-sf-testset client project-id options (:testset-name options))
                     (create-sf-testset client options sf-test-suites))]
     (let [instances (ll-testset-instances client project-id (:id testset))
           tests     (pmap (fn [test-suite]
