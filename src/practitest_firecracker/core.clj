@@ -38,12 +38,15 @@
         (let [client             (make-client (select-keys options [:email :api-token :api-uri :max-api-rate]))
               directory          (map #(.getAbsolutePath (file (:temp-folder options) %)) (:reports-path options))
               reports            (parse-reports-dir directory)
-              additional-reports (send-directory directory reports)]
+              additional-reports reports
+              ;; additional-reports (send-directory directory reports)
+              ]
           (case action
             "display-config"
             (do
               (pprint/pprint {"=============== additional-reports: ===============" additional-reports})
               (pprint/pprint {"=============== FC original reports val: ===============" reports})
+              (pprint/pprint {"=============== directory: ===============" directory})
               (clean-tmp-folder directory))
 
             "display-options"
@@ -66,18 +69,21 @@
               (exit 0 "Done"))
 
             "create-and-populate-testset"
-            (let [testset (timef
+            (let [testsets (timef
                            "create-or-update-testset"
                            (create-or-update-sf-testset client options additional-reports))]
-              (timef
-               "populate-results"
-               (populate-sf-results client
-                                    (assoc options
-                                           :skip-validation? true
-                                           :testset-id       (:id testset))
-                                    additional-reports))
-              (clean-tmp-folder directory)
-              (exit 0 (format "Populated TestSet ID: %s" (:id testset))))
+              (pprint/pprint {"=============== testsets: ===============" testsets})
+              (doseq [testset testsets]
+                (pprint/pprint {"=============== testset: ===============" testset})
+                (timef
+                 "populate-results"
+                 (populate-sf-results client
+                                      (assoc options
+                                             :skip-validation? true
+                                             :testset-id       (:id testset))
+                                      additional-reports))
+                (clean-tmp-folder directory)
+                (exit 0 (format "Populated TestSet ID: %s" (:id testset)))))
             "test"
             (let [testset (create-or-update-sf-testset client options additional-reports additional-reports)]
               (clean-tmp-folder directory)
