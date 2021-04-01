@@ -7,7 +7,7 @@
                                               populate-sf-results
                                               create-or-update-sf-testset]]
    [practitest-firecracker.surefire   :refer [parse-reports-dir]]
-   [test-xml-parser.core              :refer [send-directory remove-bom return-files delete-recursively!]]
+   [firecracker-report-parser.core    :refer [send-directory remove-bom return-files delete-recursively!]]
    [clojure.pprint                    :as     pprint]
    [clojure.java.io                   :refer [file]])
   (:gen-class))
@@ -38,14 +38,15 @@
         (let [client             (make-client (select-keys options [:email :api-token :api-uri :max-api-rate]))
               directory          (map #(.getAbsolutePath (file (:temp-folder options) %)) (:reports-path options))
               reports            (parse-reports-dir directory)
-              additional-reports reports
-              ;; additional-reports (send-directory directory reports)
+              ;; additional-reports reports
+              ;; return-val         (send-directory directory true)
+              additional-reports (send-directory directory true);;(:test-cases (first return-val))
               ]
           (case action
             "display-config"
             (do
-              (pprint/pprint {"=============== additional-reports: ===============" additional-reports})
               (pprint/pprint {"=============== FC original reports val: ===============" reports})
+              (pprint/pprint {"=============== additional-reports: ===============" additional-reports})
               (pprint/pprint {"=============== directory: ===============" directory})
               (clean-tmp-folder directory))
 

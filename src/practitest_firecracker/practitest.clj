@@ -466,7 +466,7 @@
       (update-sf-testset client options testset-name testset (read-string (:id testset))))))
 
 (defn create-or-update-sf-testset [client {:keys [project-id] :as options} sf-test-suites]
-  (let [testsets (for [name '("TS3" "TS2")]
+  (let [testsets (for [name '("TS4" "TS5")]
                    (or (find-sf-testset client project-id options name)
                        (create-sf-testset client options sf-test-suites name)))]
     (do
