@@ -1,7 +1,9 @@
 (ns practitest-firecracker.query-dsl
   (:require
    [clojure.string :as string]
-   [clojure.edn    :as edn]))
+   [clojure.edn    :as edn]
+   [clojure.pprint                    :as     pprint]
+   [clojure.tools.logging            :as log]))
 
 
 (defn fix-abbreviations [tokens]
@@ -21,6 +23,7 @@
   (Integer. (re-find  #"\d+" s )))
 
 (defn eval-query [test-suite test-case query]
+  (pprint/pprint {"IN HERE query: " query})
   (if (map? query)
     (let [{:keys [op args]} query
           args              (map (partial eval-query test-suite test-case) args)]
@@ -68,9 +71,13 @@
          (ex-info (format "Syntax error: unsupported function '%s'" op)
                   {:query query}))))
 
-    (let [key (keyword (string/join (drop 1 (str query))))]
+    (let [key (keyword (string/join (drop 1 (str query))))
+          log (pprint/pprint {"IN HERE key: " key})
+          log (pprint/pprint {"IN HERE (:name test-suite): " (:name test-suite)})
+          log (pprint/pprint {"IN HERE (:attrs test-suite)): " (:attrs test-suite)})
+          log (pprint/pprint {"IN HERE test-suite: " test-suite})]
       (cond
-        (= :test-suite-name key)              (:name test-suite)
+        (= :test-suite-name key)              (:name (:attrs test-suite))
         (= :test-case-name key)               (:name test-case)
         (and (not (= test-suite nil))
              (contains? test-suite key))      (key test-suite)

@@ -6,7 +6,8 @@
    [clj-http.client                  :as http]
    [clojure.tools.logging            :as log]
    [practitest-firecracker.query-dsl :refer [query? eval-query]]
-   [throttler.core                   :refer [fn-throttler]]))
+   [throttler.core                   :refer [fn-throttler]]
+   [clojure.pprint                    :as     pprint]))
 
 ;; ===========================================================================
 ;; api version
@@ -292,7 +293,10 @@
             additional-fields))
 
 (defn sf-test-suite->pt-test-name [options suite]
+  (pprint/pprint {"IN HERE options: " options})
+  (pprint/pprint {"IN HERE sf-test-suite->pt-test-name: " {:pt-test-name (:pt-test-name options)}})
   (let [test-name (eval-query suite {} (:pt-test-name options))]
+    (pprint/pprint {"IN HERE test-name: " test-name})
     (if (string/blank? test-name) "UNNAMED" test-name)))
 
 (defn sf-test-case->pt-step-name [options test-case]
@@ -466,9 +470,9 @@
       (update-sf-testset client options testset-name testset (read-string (:id testset))))))
 
 (defn create-or-update-sf-testset [client {:keys [project-id] :as options} sf-test-suites]
-  (let [testsets (for [name '("TS4" "TS5")]
-                   (or (find-sf-testset client project-id options name)
-                       (create-sf-testset client options sf-test-suites name)))]
+  (let [testsets (for [sf-test-suite sf-test-suites]
+                   (or (find-sf-testset client project-id options (:name (:attrs sf-test-suite)))
+                       (create-sf-testset client options (:test-cases sf-test-suite) (:name (:attrs sf-test-suite)))))]
     (do
       (log/infof "IN HERE!!!!!! testsets: %s " testsets)
       (doall
@@ -477,9 +481,10 @@
           (let [log       (log/infof "IN HERE 2222!!!!!! testsets: %s " testset)
                 instances (ll-testset-instances client project-id (:id testset))
                 tests     (pmap (fn [test-suite]
-                                  (let [test-name (sf-test-suite->pt-test-name options test-suite)]
+                                  (let [test-name (sf-test-suite->pt-test-name options test-suite)
+                                        log       (log/infof "IN HERE test-name: %s " test-name)]
                                     [test-name test-suite (ll-find-test client project-id test-name)]))
-                                sf-test-suites)
+                                (:test-list sf-test-suites))
                 nil-tests (filter #(nil? (last %)) tests)
                 old-tests (filter #(not (nil? (last %))) tests)
                 log       (log/infof "IN HERE 2222!!!!!! END:")]
