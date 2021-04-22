@@ -38,10 +38,7 @@
         (let [client             (make-client (select-keys options [:email :api-token :api-uri :max-api-rate]))
               directory          (map #(.getAbsolutePath (file (:temp-folder options) %)) (:reports-path options))
               reports            (parse-reports-dir directory)
-              ;; additional-reports reports
-              ;; return-val         (send-directory directory true)
-              additional-reports (send-directory directory true);;(:test-cases (first return-val))
-              ]
+              additional-reports (send-directory directory true)]
           (case action
             "display-config"
             (do
@@ -57,34 +54,46 @@
               (clean-tmp-folder directory))
 
             "create-testset"
-            (let [testset (create-or-update-sf-testset client options additional-reports)]
+            (do
+              (doall
+               (pmap
+                (fn [report]
+                  (let [testset (create-or-update-sf-testset client options report)]
+                    (pprint/pprint (format "Populated TestSet ID: %s" (:id testset)))))
+                additional-reports))
               (clean-tmp-folder directory)
-              (exit 0 (format "TestSet ID: %s" (:id testset))))
+              (exit 0 "Done"))
 
             "populate-testset"
             (do
-              (populate-sf-results client
-                                   options
-                                   additional-reports)
+              (doall
+               (pmap
+                (fn [report]
+                  (populate-sf-results client
+                                       options
+                                       report))
+                additional-reports))
               (clean-tmp-folder directory)
               (exit 0 "Done"))
 
             "create-and-populate-testset"
-            (let [testsets (timef
-                           "create-or-update-testset"
-                           (create-or-update-sf-testset client options additional-reports))]
-              (pprint/pprint {"=============== testsets: ===============" testsets})
-              (doseq [testset testsets]
-                (pprint/pprint {"=============== testset: ===============" testset})
-                (timef
-                 "populate-results"
-                 (populate-sf-results client
-                                      (assoc options
-                                             :skip-validation? true
-                                             :testset-id       (:id testset))
-                                      additional-reports))
-                (clean-tmp-folder directory)
-                (exit 0 (format "Populated TestSet ID: %s" (:id testset)))))
+            (do
+              (doall
+               (pmap
+                (fn [report]
+                  (let [testset (timef
+                                  "create-or-update-testset"
+                                  (create-or-update-sf-testset client options report))]
+                             (timef
+                              "populate-results"
+                              (populate-sf-results client
+                                                   (assoc options
+                                                          :skip-validation? true
+                                                          :testset-id       (:id testset))
+                                                   (:test-list report)))
+                    (pprint/pprint (format "Populated TestSet ID: %s" (:id testset))))) additional-reports))
+              (clean-tmp-folder directory)
+              (exit 0 (format "Done")))
             "test"
             (let [testset (create-or-update-sf-testset client options additional-reports additional-reports)]
               (clean-tmp-folder directory)
