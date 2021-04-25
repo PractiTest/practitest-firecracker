@@ -438,12 +438,12 @@
    :actual-results (str (:failure-message test-case) \newline (:failure-detail test-case))
    :status         (case (:failure-type test-case)
                      "failure" "FAILED"
-                     "skipped" "NO RUN"
-                     "error"   "BLOCKED"
+                     "skipped" "N/A"
+                     "error"   "FAILED"
+                     ;; will leave error as FAILED for now, will change it after we add the UI changes and add the option of ERROR to Reqirement Test and TestSet table of runs
                      nil       "PASSED"
-                     "N/A")})
+                     "NO RUN")})
 
-  ;; (if (:has-failure? test-case) "FAILED" "PASSED")
 
 (defn sf-test-suite->run-def [options test-suite]
   [{:run-duration (:time-elapsed test-suite)}
