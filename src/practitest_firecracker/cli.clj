@@ -47,8 +47,8 @@
     "JSON containing the fields that should be added when creating PractiTest TestSet"
     :default {}
     :parse-fn parse-additional-fields]
-   [nil "--test-case-as-pt-test" :default true]
-   [nil "--test-case-as-pt-test-step" :default false]
+   ;; [nil "--test-case-as-pt-test" :default true]
+   [nil "--test-case-as-pt-test-step" :default true]
    #_[nil "--pt-test-name DSL"
     :parse-fn read-query
     :default (read-query "(concat (join (capitalize (drop 2 (tokenize-package ?package-name)))) \": \" (join (capitalize (drop-last (tokenize-class-name ?test-suite-name)))))")]

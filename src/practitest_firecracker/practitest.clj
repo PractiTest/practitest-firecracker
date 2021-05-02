@@ -470,8 +470,9 @@
       (update-sf-testset client options testset-name testset (read-string (:id testset))))))
 
 (defn create-or-update-sf-testset [client {:keys [project-id] :as options} sf-test-suites]
-  (let [testset (or (find-sf-testset client project-id options (:name (:attrs sf-test-suites)))
-                    (create-sf-testset client options (:test-cases sf-test-suites) (:name (:attrs sf-test-suites))))]
+  (let [testset-name (if (:multitestset options) (:name (:attrs sf-test-suites)) (:testset-name options))
+        testset      (or (find-sf-testset client project-id options testset-name)
+                         (create-sf-testset client options (:test-cases sf-test-suites) testset-name))]
     (let [instances (ll-testset-instances client project-id (:id testset))
           tests     (doall (pmap (fn [test-suite]
                                    (let [test-name (sf-test-suite->pt-test-name options test-suite)]
