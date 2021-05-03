@@ -8,7 +8,7 @@
          org.apache.maven.surefire/surefire-report-parser {:mvn/version "2.22.2"}
          org.clojure/tools.logging                        {:mvn/version "1.1.0"}
          ch.qos.logback/logback-classic                   {:mvn/version "1.2.3"}
-         github-PractiTest/firecracker-report-parser      {:git/url "git@github.com:PractiTest/firecracker-report-parser.git" :deps/manifest :deps :sha "adb3235787258da604cab81f950c8f4f1f64e6cd"}
+         github-PractiTest/firecracker-report-parser      {:git/url "git@github.com:PractiTest/firecracker-report-parser.git" :deps/manifest :deps :sha "cc5b9dabf9be86dc57de145098c4da87494953ab"}
          }
  :aliases
  {:dev       {:extra-paths ["dev"]}

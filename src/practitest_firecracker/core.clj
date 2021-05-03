@@ -38,7 +38,7 @@
         (let [client             (make-client (select-keys options [:email :api-token :api-uri :max-api-rate]))
               directory          (map #(.getAbsolutePath (file (:temp-folder options) %)) (:reports-path options))
               reports            (parse-reports-dir directory)
-              additional-reports (if (:multitestset options) (send-directory directory (:test-case-as-pt-test-step options)) (send-directory directory reports))]
+              additional-reports (send-directory directory (:test-case-as-pt-test-step options) (:multitestset options) (:testset-name options))]
           (case action
             "display-config"
             (do
