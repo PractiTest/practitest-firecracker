@@ -113,6 +113,7 @@
    :max-api-rate-throttler (create-api-throttler max-api-rate)})
 
 (defn ll-testset [{:keys [base-uri credentials max-api-rate-throttler]} project-id id]
+  (log/infof "create testset %s" id)
   (let [uri (build-uri base-uri testset-uri project-id (if (string? id)
                                                          (Long/parseLong id)
                                                          id))]
@@ -122,6 +123,7 @@
                 :method       (max-api-rate-throttler http/get)}))))
 
 (defn ll-testset-instances [{:keys [base-uri credentials max-api-rate-throttler]} project-id testset-id]
+  (log/infof "create instances %s" testset-id)
   (let [uri (build-uri base-uri testset-instances-uri project-id)]
     (api-call {:credentials  credentials
                :uri          uri
@@ -129,6 +131,7 @@
                :query-params {:set-ids testset-id}})))
 
 (defn ll-test [{:keys [base-uri credentials max-api-rate-throttler]} project-id id]
+  (log/infof "create step %s" id)
   (let [uri (build-uri base-uri test-uri project-id id)]
     (first
      (api-call {:credentials  credentials
@@ -136,6 +139,7 @@
                 :method       (max-api-rate-throttler http/get)}))))
 
 (defn ll-test-steps [{:keys [base-uri credentials max-api-rate-throttler]} project-id test-id]
+  (log/infof "create step %s" test-id)
   (let [uri (build-uri base-uri test-steps-uri project-id)]
     (api-call {:credentials  credentials
                :uri          uri
@@ -143,6 +147,7 @@
                :query-params {:test-ids test-id}})))
 
 (defn ll-create-test [{:keys [base-uri credentials max-api-rate-throttler]} project-id attributes steps]
+  (log/infof "create test %s" attributes)
   (let [uri (build-uri base-uri create-test-uri project-id)]
     (first
      (api-call {:credentials  credentials
@@ -153,6 +158,7 @@
                                       :steps      {:data steps}}}}))))
 
 (defn ll-create-testset [{:keys [base-uri credentials max-api-rate-throttler]} project-id attributes test-ids]
+  (log/infof "create testset %s" (:name attributes))
   (let [uri (build-uri base-uri create-testset-uri project-id)]
     (first
      (api-call {:credentials  credentials
@@ -163,6 +169,7 @@
                                       :instances  {:test-ids test-ids}}}}))))
 
 (defn ll-create-instance [{:keys [base-uri credentials max-api-rate-throttler]} project-id testset-id test-id]
+  (log/infof "create instance for testset-id %s and test-id %s" testset-id test-id)
   ;; TODO: bulk-create instances (same set id, multiple test ids)
   (let [uri (build-uri base-uri create-instance-uri project-id)]
     (first
@@ -174,6 +181,7 @@
                                                    :test-id test-id}}}}))))
 
 (defn ll-create-run [{:keys [base-uri credentials max-api-rate-throttler]} project-id instance-id attributes steps]
+  (log/infof "create run for instance %s" instance-id)
   (let [uri (build-uri base-uri create-run-uri project-id)]
     (first
      (api-call {:credentials  credentials
@@ -184,6 +192,7 @@
                                       :steps      {:data steps}}}}))))
 
 (defn ll-create-runs [{:keys [base-uri credentials max-api-rate-throttler]} project-id runs]
+  (log/infof "create runs %s" runs)
   (let [uri (build-uri base-uri create-run-uri project-id)]
     (api-call {:credentials  credentials
                :uri          uri
@@ -194,6 +203,7 @@
                                        :steps      {:data steps}})}})))
 
 (defn ll-find-test [{:keys [base-uri credentials max-api-rate-throttler]} project-id name]
+  (log/infof "searching for test %s" name)
   (let [uri (build-uri base-uri list-tests-uri project-id)]
     ;; in case there are more than one test with this name, return the first one
     (first
@@ -203,6 +213,7 @@
                 :query-params {:name_exact name}}))))
 
 (defn ll-find-instance [{:keys [base-uri credentials max-api-rate-throttler]} project-id testset-id test-id]
+  (log/infof "searching for instance by test-id %s and testset-id %s" test-id testset-id)
   (let [uri (build-uri base-uri testset-instances-uri project-id)]
     (first
      (api-call {:credentials  credentials
@@ -451,18 +462,15 @@
 
 (defn populate-sf-results [client {:keys [project-id testset-id] :as options} sf-test-suites]
   (log/infof "populating testset %s with results from %d suites" testset-id (count sf-test-suites))
-
   (when (or (:skip-validation? options)
             (validate-testset client project-id testset-id sf-test-suites))
     (doall
      (pmap (fn [test-suite]
-             (log/infof "START instance population options: %s " options)
              (let [test-name       (sf-test-suite->pt-test-name options test-suite)
                    log             (log/infof "instance test-name: %s " test-name)
                    test            (ll-find-test client project-id test-name)
                    instance        (ll-find-instance client project-id testset-id (:id test))
                    [run run-steps] (sf-test-suite->run-def options test-suite)]
-               (log/infof "instance id %s" (:id instance))
                (ll-create-run client project-id (:id instance) run run-steps)))
            sf-test-suites))
     true))
