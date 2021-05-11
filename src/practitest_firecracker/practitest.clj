@@ -292,7 +292,7 @@
             additional-fields))
 
 (defn sf-test-suite->pt-test-name [options suite]
-  (let [test-name (eval-query (first (:test-cases suite)) {} (:pt-test-name options))]
+  (let [test-name (eval-query suite {} (:pt-test-name options))]
     (if (string/blank? test-name) "UNNAMED" test-name)))
 
 (defn sf-test-case->pt-step-name [options test-case]
@@ -456,10 +456,13 @@
             (validate-testset client project-id testset-id sf-test-suites))
     (doall
      (pmap (fn [test-suite]
+             (log/infof "START instance population options: %s " options)
              (let [test-name       (sf-test-suite->pt-test-name options test-suite)
+                   log             (log/infof "instance test-name: %s " test-name)
                    test            (ll-find-test client project-id test-name)
                    instance        (ll-find-instance client project-id testset-id (:id test))
                    [run run-steps] (sf-test-suite->run-def options test-suite)]
+               (log/infof "instance id %s" (:id instance))
                (ll-create-run client project-id (:id instance) run run-steps)))
            sf-test-suites))
     true))

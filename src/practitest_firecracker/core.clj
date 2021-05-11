@@ -7,7 +7,7 @@
                                               populate-sf-results
                                               create-or-update-sf-testset]]
    [practitest-firecracker.surefire   :refer [parse-reports-dir]]
-   [firecracker-report-parser.core    :refer [send-directory remove-bom return-files delete-recursively!]]
+   [firecracker-report-parser.core    :refer [send-directory remove-bom return-files delete-recursively! parse-files]]
    [clojure.pprint                    :as     pprint]
    [clojure.java.io                   :refer [file]])
   (:gen-class))
@@ -38,7 +38,10 @@
         (let [client             (make-client (select-keys options [:email :api-token :api-uri :max-api-rate]))
               directory          (map #(.getAbsolutePath (file (:temp-folder options) %)) (:reports-path options))
               reports            (parse-reports-dir directory)
-              additional-reports (send-directory directory (:test-case-as-pt-test-step options) (:multitestset options) (:testset-name options))]
+              dir                (for [dir directory] (clojure.java.io/file dir))
+              parsed-dirs        (for [dir (file-seq (first dir))] (parse-files dir))
+              additional-reports (send-directory parsed-dirs (:test-case-as-pt-test-step options) (:multitestset options) (:testset-name options))]
+          ;; (clean-tmp-folder directory)
           (case action
             "display-config"
             (do
