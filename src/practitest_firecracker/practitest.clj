@@ -147,7 +147,7 @@
                :query-params {:test-ids test-id}})))
 
 (defn ll-create-test [{:keys [base-uri credentials max-api-rate-throttler]} project-id attributes steps]
-  (log/infof "create test %s" attributes)
+  (log/infof "create test %s" (:name attributes))
   (let [uri (build-uri base-uri create-test-uri project-id)]
     (first
      (api-call {:credentials  credentials
@@ -223,6 +223,7 @@
                                :test-ids test-id}}))))
 
 (defn ll-find-testset [{:keys [base-uri credentials max-api-rate-throttler]} project-id name]
+  (log/infof "searching for testset %s" name)
   (let [uri (build-uri base-uri list-testsets-uri project-id)]
     (first
      (api-call {:credentials  credentials
@@ -231,6 +232,7 @@
                 :query-params {:name_exact name}}))))
 
 (defn ll-get-custom-field [{:keys [base-uri credentials max-api-rate-throttler]} project-id cf-id]
+  (log/infof "searching custom field %s" cf-id)
   (let [uri (build-uri base-uri custom-field-uri project-id cf-id)]
     (first
      (api-call {:credentials  credentials
@@ -238,6 +240,7 @@
                 :method       (max-api-rate-throttler http/get)}))))
 
 (defn ll-update-custom-field [{:keys [base-uri credentials max-api-rate-throttler]} project-id cf-id possible-values]
+  (log/infof "update custom field %s to possible-values: %s" cf-id possible-values)
   (let [uri (build-uri base-uri custom-field-uri project-id cf-id)]
     (first
      (api-call {:credentials  credentials
@@ -247,6 +250,7 @@
                                       :attributes {:possible-values possible-values}}}}))))
 
 (defn ll-update-test [{:keys [base-uri credentials max-api-rate-throttler]} project-id attributes steps cf-id]
+  (log/infof "update test %s in custom field id %s" (:name attributes) cf-id)
   (let [uri (build-uri base-uri update-test-uri project-id cf-id)]
     (first
      (api-call {:credentials  credentials
@@ -257,6 +261,7 @@
                                       :steps      {:data steps}}}}))))
 
 (defn ll-update-testset [{:keys [base-uri credentials max-api-rate-throttler]} project-id attributes steps cf-id]
+  (log/infof "update testset %s in field id %s" (:name attributes) cf-id)
   (let [uri (build-uri base-uri update-testset-uri project-id cf-id)]
     (first
      (api-call {:credentials  credentials
