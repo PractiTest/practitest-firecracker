@@ -30,7 +30,7 @@
       (let [client             (make-client (select-keys options [:email :api-token :api-uri :max-api-rate]))
             directory          (:reports-path options)
             dirs               (for [dir directory] (clojure.java.io/file dir))
-            parsed-dirs        (for [dir dirs] (parse-files (file-seq dir)))
+            parsed-dirs        (for [dir (file-seq (first dirs))] (parse-files dir))
             additional-reports (send-directory parsed-dirs (:test-case-as-pt-test-step options) (:multitestset options) (:testset-name options) false)]
           (case action
             "display-config"

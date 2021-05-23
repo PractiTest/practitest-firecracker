@@ -54,7 +54,7 @@
     :default (read-query "(concat (join (capitalize (drop 2 (tokenize-package ?package-name)))) \": \" (join (capitalize (drop-last (tokenize-class-name ?test-suite-name)))))")]
    [nil "--pt-test-name DSL"
     :parse-fn read-query
-    :default (read-query "?test-suite-name")]
+    :default (read-query "?pt-test-name")]
    #_[nil "--pt-test-step-name DSL"
     :parse-fn read-query
     :default (read-query "(join (capitalize (tokenize-class-name ?test-case-name)))")]
