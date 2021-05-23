@@ -6,7 +6,7 @@
                                               populate-sf-results-old
                                               populate-sf-results
                                               create-or-update-sf-testset]]
-   [firecracker-report-parser.core    :refer [send-directory remove-bom return-files delete-recursively! parse-files]]
+   [firecracker-report-parser.core    :refer [send-directory parse-files]]
    [clojure.pprint                    :as     pprint]
    [clojure.java.io                   :refer [file]])
   (:gen-class))
@@ -23,37 +23,25 @@
        (println (str ~module " elapsed time: " (/ (double (- (. System (nanoTime)) start#)) 1000000.0) " msecs")))
      ret#))
 
-(defn clean-tmp-folder [directory]
-  (doseq [path directory]
-    (delete-recursively! path)))
-
 (defn -main [& args]
   (let [{:keys [action options exit-message ok?]} (parse-args args)]
     (if exit-message
       (exit (if ok? 0 1) exit-message)
-      (do
-        (doseq [report-path (:reports-path options)]
-          (remove-bom report-path (:temp-folder options)))
-        (let [client             (make-client (select-keys options [:email :api-token :api-uri :max-api-rate]))
-              directory          (map #(.getAbsolutePath (file (:temp-folder options) %)) (:reports-path options))
-              ;; reports            (parse-reports-dir directory)
-              dir                (for [dir directory] (clojure.java.io/file dir))
-              parsed-dirs        (for [dir (file-seq (first dir))] (parse-files dir))
-              additional-reports (send-directory parsed-dirs (:test-case-as-pt-test-step options) (:multitestset options) (:testset-name options) false)]
-          ;; (clean-tmp-folder directory)
+      (let [client             (make-client (select-keys options [:email :api-token :api-uri :max-api-rate]))
+            directory          (:reports-path options)
+            dirs               (for [dir directory] (clojure.java.io/file dir))
+            parsed-dirs        (for [dir dirs] (parse-files (file-seq dir)))
+            additional-reports (send-directory parsed-dirs (:test-case-as-pt-test-step options) (:multitestset options) (:testset-name options) false)]
           (case action
             "display-config"
             (do
-              ;; (pprint/pprint {"=============== FC original reports val: ===============" reports})
               (pprint/pprint {"=============== additional-reports: ===============" additional-reports})
-              (pprint/pprint {"=============== directory: ===============" directory})
-              (clean-tmp-folder directory))
+              (pprint/pprint {"=============== directory: ===============" directory}))
 
             "display-options"
             (do
               (pprint/pprint {"=============== options: ===============" options})
-              (pprint/pprint {"=============== args: ===============" args})
-              (clean-tmp-folder directory))
+              (pprint/pprint {"=============== args: ===============" args}))
 
             "create-testset"
             (do
@@ -63,7 +51,6 @@
                   (let [testset (create-or-update-sf-testset client options report)]
                     (pprint/pprint (format "Populated TestSet ID: %s" (:id testset)))))
                 additional-reports))
-              (clean-tmp-folder directory)
               (exit 0 "Done"))
 
             "populate-testset"
@@ -75,7 +62,6 @@
                                        options
                                        report))
                 additional-reports))
-              (clean-tmp-folder directory)
               (exit 0 "Done"))
 
             "create-and-populate-testset"
@@ -94,10 +80,8 @@
                                                           :testset-id       (:id testset))
                                                    (:test-list report)))
                     (pprint/pprint (format "Populated TestSet ID: %s" (:id testset))))) additional-reports))
-              (clean-tmp-folder directory)
               (exit 0 (format "Done")))
             "test"
             (let [testset (create-or-update-sf-testset client options additional-reports additional-reports)]
-              (clean-tmp-folder directory)
               (exit 0 (format "TestSet ID: %s" (:id testset)))))
-          )))))
+          ))))
