@@ -171,8 +171,8 @@
 (defn make-instances [testset-id tests]
   (for [test tests]
     {:type       "instances"
-     :attributes {:set-id (Integer/parseInt testset-id)
-                  :test-id (Integer/parseInt (:id test))}}))
+     :attributes {:set-id testset-id
+                  :test-id (or (:id test) test)}}))
 
 (defn ll-create-instance [{:keys [base-uri credentials max-api-rate-throttler]} project-id testset-id test-id]
   (log/infof "create instance for testset-id %s and test-id %s" testset-id test-id)
@@ -221,7 +221,7 @@
                  :form-params  {:data (reduce conj []
                                               (for [run (into () runs)]
                                                 {:type       "instances"
-                                                 :attributes (assoc (:attributes run) :instance-id (Integer/parseInt (:instance-id run)))
+                                                 :attributes (assoc (:attributes run) :instance-id (:instance-id run))
                                                  :steps      {:data (reduce conj [] (:steps run))}}))}}))))
 
 (defn ll-find-test [{:keys [base-uri credentials max-api-rate-throttler]} project-id name]
@@ -515,6 +515,8 @@
       (let [missing-tests (difference (set (map #(read-string (:id (last %))) (remove #(nil? (last %)) tests)))
                                       (set (map #(get-in % [:attributes :test-id]) instances)))
             instances (into [] (make-instances (:id testset) missing-tests))]
-        (doall (for [instances-part (partition-all 20 instances)]
-                 (ll-create-instances client project-id instances-part))))
+        (when instances
+          (doall
+           (for [instances-part (partition-all 100 instances)]
+             (ll-create-instances client project-id instances-part)))))
       testset)))
