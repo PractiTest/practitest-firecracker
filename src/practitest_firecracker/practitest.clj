@@ -504,7 +504,7 @@
                                 (create-sf-test client options test-suite))
                               nil-tests)
               instances (into [] (make-instances (:id testset) new-tests))]
-          (doall (for [instances-part (partition-all 20 instances)]
+          (doall (for [instances-part (partition-all 100 instances)]
                    (ll-create-instances client project-id instances-part)))))
       (when (seq old-tests)
         ;; update existing tests with new values
