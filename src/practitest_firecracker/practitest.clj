@@ -168,10 +168,11 @@
                                       :attributes attributes
                                       :instances  {:test-ids test-ids}}}}))))
 
-(defn make-instances [testset-to-test-ids]
-  (for [testset-to-test testset-to-test-ids]
-    {:attributes {:set-id (:testset-id testset-to-test)
-                  :test-id (:test-id testset-to-test)}}))
+(defn make-instances [testset-id tests]
+  (for [test tests]
+    {:type       "instances"
+     :attributes {:set-id (Integer/parseInt testset-id)
+                  :test-id (Integer/parseInt (:id test))}}))
 
 (defn ll-create-instance [{:keys [base-uri credentials max-api-rate-throttler]} project-id testset-id test-id]
   (log/infof "create instance for testset-id %s and test-id %s" testset-id test-id)
@@ -184,17 +185,18 @@
                                       :attributes {:set-id  testset-id
                                                    :test-id test-id}}}}))))
 
-(defn ll-create-instances [{:keys [base-uri credentials max-api-rate-throttler]} project-id testset-id test-id]
-  (log/infof "create instance for testset-id %s and test-id %s" testset-id test-id)
-  ;; TODO: bulk-create instances (same set id, multiple test ids)
+(defn has-duplicates? [key runs]
+  (let [grouped (group-by key (into [] runs))]
+    (not (= (count runs) (count grouped)))))
+
+(defn ll-create-instances [{:keys [base-uri credentials max-api-rate-throttler]} project-id instances]
+  (log/infof "create instances")
   (let [uri (build-uri base-uri create-instance-uri project-id)]
     (first
      (api-call {:credentials  credentials
                 :uri          uri
                 :method       (max-api-rate-throttler http/post)
-                :form-params  {:data {:type       "instances"
-                                      :attributes {:set-id  testset-id
-                                                   :test-id test-id}}}}))))
+                :form-params  {:data instances}}))))
 
 (defn ll-create-run [{:keys [base-uri credentials max-api-rate-throttler]} project-id instance-id attributes steps]
   (log/infof "create run for instance %s" instance-id)
@@ -207,14 +209,10 @@
                                       :attributes (assoc attributes :instance-id instance-id)
                                       :steps      {:data steps}}}}))))
 
-(defn has-duplicates? [runs]
-  (let [grouped (group-by :instance-id (into [] runs))]
-    (not (= (count runs) (count grouped)))))
-
 (defn ll-create-runs [{:keys [base-uri credentials max-api-rate-throttler]} project-id runs]
   (log/infof "create runs")
   (let [uri (build-uri base-uri create-run-uri project-id)]
-    (if (has-duplicates? runs)
+    (if (has-duplicates? :instance-id runs)
       (for [[instance-id run run-steps] runs]
         (ll-create-run {:base-uri base-uri :credentials credentials :max-api-rate-throttler max-api-rate-throttler} project-id instance-id run run-steps))
       (api-call {:credentials  credentials
@@ -504,9 +502,10 @@
         ;; create missing tests and add them to the testset
         (let [new-tests (pmap (fn [[_ test-suite _]]
                                 (create-sf-test client options test-suite))
-                              nil-tests)]
-          (doall
-           (pmap #(ll-create-instance client project-id (:id testset) (:id %)) new-tests))))
+                              nil-tests)
+              instances (into [] (make-instances (:id testset) new-tests))]
+          (doall (for [instances-part (partition-all 20 instances)]
+                   (ll-create-instances client project-id instances-part)))))
       (when (seq old-tests)
         ;; update existing tests with new values
         (doall (map (fn [[_ test-suite test]]
@@ -514,7 +513,8 @@
                     old-tests)))
       ;; add any missing instances to the testset
       (let [missing-tests (difference (set (map #(read-string (:id (last %))) (remove #(nil? (last %)) tests)))
-                                      (set (map #(get-in % [:attributes :test-id]) instances)))]
-        (doall
-         (pmap #(ll-create-instance client project-id (:id testset) %) missing-tests)))
+                                      (set (map #(get-in % [:attributes :test-id]) instances)))
+            instances (into [] (make-instances (:id testset) missing-tests))]
+        (doall (for [instances-part (partition-all 20 instances)]
+                 (ll-create-instances client project-id instances-part))))
       testset)))
