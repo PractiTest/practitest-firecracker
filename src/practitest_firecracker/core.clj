@@ -3,9 +3,10 @@
    [practitest-firecracker.cli        :refer [parse-args]]
    [practitest-firecracker.practitest :refer [make-client
                                               create-sf-testset
-                                              populate-sf-results-old
+                                              make-runs
                                               populate-sf-results
-                                              create-or-update-sf-testset]]
+                                              create-or-update-sf-testset
+                                              ll-create-runs]]
    [firecracker-report-parser.core    :refer [send-directory parse-files]]
    [clojure.pprint                    :as     pprint]
    [clojure.java.io                   :refer [file]])
@@ -71,14 +72,16 @@
                 (fn [report]
                   (let [testset (timef
                                   "create-or-update-testset"
-                                  (create-or-update-sf-testset client options report))]
-                             (timef
+                                  (create-or-update-sf-testset client options report))
+                        runs (timef
                               "populate-results"
-                              (populate-sf-results client
-                                                   (assoc options
-                                                          :skip-validation? true
-                                                          :testset-id       (:id testset))
-                                                   (:test-list report)))
+                              (make-runs client
+                                         (assoc options
+                                                :skip-validation? true
+                                                :testset-id       (:id testset))
+                                         (:test-list report)))]
+                    (doall (for [runs-part (partition-all 20 runs)]
+                             (ll-create-runs client (:project-id options) runs-part)))
                     (pprint/pprint (format "Populated TestSet ID: %s" (:id testset))))) additional-reports))
               (exit 0 (format "Done")))
             "test"

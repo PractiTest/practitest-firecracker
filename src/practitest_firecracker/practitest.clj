@@ -168,7 +168,23 @@
                                       :attributes attributes
                                       :instances  {:test-ids test-ids}}}}))))
 
+(defn make-instances [testset-to-test-ids]
+  (for [testset-to-test testset-to-test-ids]
+    {:attributes {:set-id (:testset-id testset-to-test)
+                  :test-id (:test-id testset-to-test)}}))
+
 (defn ll-create-instance [{:keys [base-uri credentials max-api-rate-throttler]} project-id testset-id test-id]
+  (log/infof "create instance for testset-id %s and test-id %s" testset-id test-id)
+  (let [uri (build-uri base-uri create-instance-uri project-id)]
+    (first
+     (api-call {:credentials  credentials
+                :uri          uri
+                :method       (max-api-rate-throttler http/post)
+                :form-params  {:data {:type       "instances"
+                                      :attributes {:set-id  testset-id
+                                                   :test-id test-id}}}}))))
+
+(defn ll-create-instances [{:keys [base-uri credentials max-api-rate-throttler]} project-id testset-id test-id]
   (log/infof "create instance for testset-id %s and test-id %s" testset-id test-id)
   ;; TODO: bulk-create instances (same set id, multiple test ids)
   (let [uri (build-uri base-uri create-instance-uri project-id)]
@@ -191,16 +207,24 @@
                                       :attributes (assoc attributes :instance-id instance-id)
                                       :steps      {:data steps}}}}))))
 
+(defn has-duplicates? [runs]
+  (let [grouped (group-by :instance-id (into [] runs))]
+    (not (= (count runs) (count grouped)))))
+
 (defn ll-create-runs [{:keys [base-uri credentials max-api-rate-throttler]} project-id runs]
-  (log/infof "create runs %s" runs)
+  (log/infof "create runs")
   (let [uri (build-uri base-uri create-run-uri project-id)]
-    (api-call {:credentials  credentials
-               :uri          uri
-               :method       (max-api-rate-throttler http/post)
-               :form-params  {:data (for [[instance-id attributes steps] runs]
-                                      {:type       "instances"
-                                       :attributes (assoc attributes :instance-id instance-id)
-                                       :steps      {:data steps}})}})))
+    (if (has-duplicates? runs)
+      (for [[instance-id run run-steps] runs]
+        (ll-create-run {:base-uri base-uri :credentials credentials :max-api-rate-throttler max-api-rate-throttler} project-id instance-id run run-steps))
+      (api-call {:credentials  credentials
+                 :uri          uri
+                 :method       (max-api-rate-throttler http/post)
+                 :form-params  {:data (reduce conj []
+                                              (for [run (into () runs)]
+                                                {:type       "instances"
+                                                 :attributes (assoc (:attributes run) :instance-id (Integer/parseInt (:instance-id run)))
+                                                 :steps      {:data (reduce conj [] (:steps run))}}))}}))))
 
 (defn ll-find-test [{:keys [base-uri credentials max-api-rate-throttler]} project-id name]
   (log/infof "searching for test %s" name)
@@ -315,20 +339,6 @@
   (let [step-name (eval-query {} test-case (:pt-test-step-name options))]
     (if (string/blank? step-name) "UNNAMED" step-name)))
 
-(defn sf-test-case->step-def-old [test-case]
-  {:name (:full-name test-case)})
-
-(defn sf-test-suite->test-def-old [test-suite]
-  [{:name (str (:package-name test-suite) ":" (:name test-suite))}
-   (map sf-test-case->step-def-old (:test-cases test-suite))])
-
-(defn create-sf-test-old [client project-id author-id additional-fields sf-test-suite]
-  (let [[test-def step-defs] (sf-test-suite->test-def-old sf-test-suite)
-        test                 (ll-find-test client project-id (:name test-def))]
-    (if test
-      test
-      (ll-create-test client project-id (merge test-def {:author-id author-id} additional-fields) step-defs))))
-
 (defn sf-test-case->step-def [options test-case]
   {:name (sf-test-case->pt-step-name options test-case)})
 
@@ -393,10 +403,6 @@
                     step-defs
                     testset-id)))
 
-(defn create-sf-testset-old [client project-id author-id additional-test-fields sf-name additional-testset-fields sf-test-suites]
-  (let [tests (map (partial create-sf-test client project-id author-id additional-test-fields) sf-test-suites)]
-    (ll-create-testset client project-id (merge {:name sf-name} additional-testset-fields) (map :id tests))))
-
 (defn create-sf-testset [client options sf-test-suites testset-name]
   (let [tests                      (map (partial create-sf-test client options) sf-test-suites)
         additional-testset-fields  (:additional-testset-fields options)
@@ -406,15 +412,6 @@
                        (merge {:name testset-name}
                               additional-testset-fields)
                        (map :id tests))))
-
-(defn sf-test-case->run-step-def-old [test-case]
-  {:name           (:full-name test-case)
-   :actual-results (str (:failure-message test-case) \newline (:failure-detail test-case))
-   :status         (if (:has-failure? test-case) "FAILED" "PASSED")})
-
-(defn sf-test-suite->run-def-old [test-suite]
-  [{:run-duration (:time-elapsed test-suite)}
-   (map sf-test-case->run-step-def-old (:test-cases test-suite))])
 
 (defn validate-testset [client project-id testset-id sf-test-suites]
   ;; check that all tests exist in the given testset
@@ -436,19 +433,6 @@
         (throw (ex-info "some tests are not part of the given testset" {:test-ids not-in-ts}))))
     true))
 
-(defn populate-sf-results-old [client project-id testset-id sf-test-suites]
-  (log/infof "populating testset %s with results from %d suites" testset-id (count sf-test-suites))
-  (when (validate-testset client project-id testset-id sf-test-suites)
-    (doall
-     (map (fn [sf-test-suite]
-            (let [test-name       (str (:package-name sf-test-suite) ":" (:name sf-test-suite))
-                  test            (ll-find-test client project-id test-name)
-                  instance        (ll-find-instance client project-id testset-id (:id test))
-                  [run run-steps] (sf-test-suite->run-def-old sf-test-suite)]
-              (ll-create-run client project-id (:id instance) run run-steps)))
-          sf-test-suites))
-    true))
-
 (defn sf-test-case->run-step-def [options test-case]
   {:name           (sf-test-case->pt-step-name options test-case)
    :actual-results (str (:failure-message test-case) \newline (:failure-detail test-case))
@@ -460,10 +444,30 @@
                      nil       "PASSED"
                      "NO RUN")})
 
-
 (defn sf-test-suite->run-def [options test-suite]
   [{:run-duration (:time-elapsed test-suite)}
    (map (partial sf-test-case->run-step-def options) (:test-cases test-suite))])
+
+(defn make-runs [client {:keys [project-id testset-id] :as options} sf-test-suites]
+  (log/infof "make-runs %s with results from %d suites" testset-id (count sf-test-suites))
+  (when (or (:skip-validation? options)
+            (validate-testset client project-id testset-id sf-test-suites))
+    (let [result
+          (for [test-suite sf-test-suites]
+            (let [test-name       (sf-test-suite->pt-test-name options test-suite)
+                  log             (log/infof "instance test-name: %s " test-name)
+                  test            (ll-find-test client project-id test-name)
+                  instance        (ll-find-instance client project-id testset-id (:id test))
+                  [run run-steps] (sf-test-suite->run-def options test-suite)]
+              ;; (ll-create-run client project-id (:id instance) run run-steps)
+              {:instance-id (:id instance)
+               :attributes run
+               :steps run-steps
+               }))]
+      result)))
+;; -d '{"data":
+;; [{ "type": "instances", "attributes": {"instance-id": 105716, "exit-code": 0, "automated-execution-output": "THIS IS MY OUTPUT"}},
+;;  { "type": "instances", "attributes": {"instance-id": 105717, "exit-code": 0, "automated-execution-output": "THIS IS MY OUTPUT"}}]}'
 
 (defn populate-sf-results [client {:keys [project-id testset-id] :as options} sf-test-suites]
   (log/infof "populating testset %s with results from %d suites" testset-id (count sf-test-suites))

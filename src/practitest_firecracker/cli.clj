@@ -148,7 +148,7 @@
         (nil? (:author-id options))
         {:exit-message (missing-option-msg "create-and-populate-testset" "author-id")}
 
-        (nil? (:testset-name options))
+        (and (nil? (:testset-name options)) (not (:multitestset options)))
         {:exit-message (missing-option-msg "create-and-populate-testset" "testset-name")}
 
         :else
