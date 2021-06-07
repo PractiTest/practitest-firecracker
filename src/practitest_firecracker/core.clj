@@ -6,11 +6,14 @@
                                               make-runs
                                               populate-sf-results
                                               create-or-update-sf-testset
-                                              ll-create-runs]]
+                                              ll-create-runs
+                                              create-testsets
+                                              create-tests]]
    [firecracker-report-parser.core    :refer [send-directory parse-files]]
    [clojure.pprint                    :as     pprint]
    [clojure.java.io                   :refer [file]])
   (:gen-class))
+
 
 (defn exit [status msg]
   (println msg)
@@ -70,21 +73,23 @@
               (doall
                (pmap
                 (fn [report]
-                  (let [testset (timef
-                                  "create-or-update-testset"
-                                  (create-or-update-sf-testset client options report))
-                        runs (timef
-                              "populate-results"
-                              (make-runs client
-                                         (assoc options
-                                                :skip-validation? true
-                                                :testset-id       (:id testset))
-                                         (:test-list report)))]
-                    (doall (for [runs-part (partition-all 20 runs)]
+                  (let [[testset all-tests]     (create-or-update-sf-testset client options report)
+                        runs                    (make-runs client
+                                                           (merge options
+                                                                  {:skip-validation?   true
+                                                                   :testset-id         (:id testset)})
+                                                           all-tests)]
+                    (doall (for [runs-part (partition-all 20 (shuffle runs))]
                              (ll-create-runs client (:project-id options) runs-part)))
-                    (pprint/pprint (format "Populated TestSet ID: %s" (:id testset))))) additional-reports))
+                    (pprint/pprint (format "Populated TestSet ID: %s" (:id testset)))))
+                additional-reports))
+              (exit 0 (format "Done")))
+            "create-and-populate-testset2"
+            (do
+              (-> (create-testsets client options additional-reports)
+                  (create-tests client options)
+                  pprint/pprint)
               (exit 0 (format "Done")))
             "test"
             (let [testset (create-or-update-sf-testset client options additional-reports additional-reports)]
-              (exit 0 (format "TestSet ID: %s" (:id testset)))))
-          ))))
+              (exit 0 (format "TestSet ID: %s" (:id testset)))))))))
