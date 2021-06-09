@@ -49,15 +49,15 @@
               (pprint/pprint {"=============== options: ===============" options})
               (pprint/pprint {"=============== args: ===============" args}))
 
-            "create-testset"
-            (do
-              (doall
-               (pmap
-                (fn [report]
-                  (let [testset (create-or-update-sf-testset client options report)]
-                    (pprint/pprint (format "Populated TestSet ID: %s" (:id testset)))))
-                additional-reports))
-              (exit 0 "Done"))
+            ;; "create-testset"
+            ;; (do
+            ;;   (doall
+            ;;    (pmap
+            ;;     (fn [report]
+            ;;       (let [testset (create-or-update-sf-testset client options report)]
+            ;;         (pprint/pprint (format "Populated TestSet ID: %s" (:id testset)))))
+            ;;     additional-reports))
+            ;;   (exit 0 "Done"))
 
             "populate-testset"
             (do
@@ -80,7 +80,4 @@
                   (create-instances client options start-time)
                   (make-runs client options start-time)
                   (create-runs client options start-time)))
-              (exit 0 (format "Done")))
-            "test"
-            (let [testset (create-or-update-sf-testset client options additional-reports additional-reports)]
-              (exit 0 (format "TestSet ID: %s" (:id testset)))))))))
+              (exit 0 (format "Done"))))))))

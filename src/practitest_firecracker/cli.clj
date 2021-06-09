@@ -117,19 +117,19 @@
         :else
         {:action "display-options" :options options})
 
-      (= "create-testset" (first arguments))
-      (cond
-        (nil? (:project-id options))
-        {:exit-message (missing-option-msg "create-testset" "project-id")}
+      ;; (= "create-testset" (first arguments))
+      ;; (cond
+      ;;   (nil? (:project-id options))
+      ;;   {:exit-message (missing-option-msg "create-testset" "project-id")}
 
-        (nil? (:author-id options))
-        {:exit-message (missing-option-msg "create-testset" "author-id")}
+      ;;   (nil? (:author-id options))
+      ;;   {:exit-message (missing-option-msg "create-testset" "author-id")}
 
-        (nil? (:testset-name options))
-        {:exit-message (missing-option-msg "create-testset" "testset-name")}
+      ;;   (nil? (:testset-name options))
+      ;;   {:exit-message (missing-option-msg "create-testset" "testset-name")}
 
-        :else
-        {:action "create-testset" :options options})
+      ;;   :else
+      ;;   {:action "create-testset" :options options})
 
       (= "populate-testset" (first arguments))
       (cond
@@ -142,7 +142,7 @@
         :else
         {:action "populate-testset" :options options})
 
-      (= "create-and-populate-testset" (first arguments))
+      (= "create-and-populate-testsets" (first arguments))
       (cond
         (nil? (:project-id options))
         {:exit-message (missing-option-msg "create-and-populate-testset" "project-id")}
@@ -154,20 +154,7 @@
         {:exit-message (missing-option-msg "create-and-populate-testset" "testset-name")}
 
         :else
-        {:action "create-and-populate-testset" :options options})
+        {:action "create-and-populate-testsets" :options options})
 
-      (= "create-and-populate-testset2" (first arguments))
-      (cond
-        (nil? (:project-id options))
-        {:exit-message (missing-option-msg "create-and-populate-testset" "project-id")}
-
-        (nil? (:author-id options))
-        {:exit-message (missing-option-msg "create-and-populate-testset" "author-id")}
-
-        (and (nil? (:testset-name options)) (not (:multitestset options)))
-        {:exit-message (missing-option-msg "create-and-populate-testset" "testset-name")}
-
-        :else
-        {:action "create-and-populate-testset2" :options options})
       :else
       {:exit-message (format "\nUnsupported action [%s]\n\n%s" (first arguments) (usage summary))})))
