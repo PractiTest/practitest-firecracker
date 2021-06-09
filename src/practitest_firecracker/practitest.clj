@@ -530,59 +530,6 @@
                                                {(sf-test-suite->pt-test-name options test) test})))]
     [all-tests testset-id-testnames]))
 
-(defn create-or-update-sf-testset [client {:keys [project-id display-action-logs display-run-time] :as options} sf-test-suites start-time]
-  (let [testset-name (or (:name (:attrs sf-test-suites) (:name sf-test-suites)))
-        testset      (or (find-sf-testset client [project-id display-action-logs] options testset-name)
-                         (create-sf-testset client options (:test-cases sf-test-suites) testset-name))
-        log          (if display-run-time (print-run-time "Time - after testset creation: %d:%d:%d" start-time) nil)]
-    (let [name-test  (doall (into {} (for [test (:test-list sf-test-suites)]
-                                       {(sf-test-suite->pt-test-name options test) test})))
-          new-tests  (into [] (group-test-names (:test-list sf-test-suites) options))
-          results    (doall
-                      (flatten
-                       (into []
-                             (pmap
-                              (fn [new-tests-part]
-                                (ll-find-tests client [project-id display-action-logs] new-tests-part)) (partition-all 20 (shuffle new-tests))))))
-          tests (doall (for [res results]
-                         [(:name_exact (:query res)) (get name-test (:name_exact (:query res))) (first (:data (:tests res)))]))
-          log       (if display-run-time (print-run-time "Time - after find all tests: %d:%d:%d" start-time) nil)
-          nil-tests (filter #(nil? (last %)) tests)
-          old-tests (filter #(not (nil? (last %))) tests)
-
-          tests-after (if (seq nil-tests)
-                        ;; create missing tests and add them to the testset
-                        (let [new-tests (pmap (fn [[test-name test-suite _]]
-                                                [test-name test-suite (create-sf-test client options test-suite)])
-                                              nil-tests)
-                              instances (into [] (make-instances (:id testset) (map last new-tests)))]
-                          (doall (for [instances-part (partition-all 100 (shuffle instances))]
-                                   (ll-create-instances client [project-id display-action-logs] instances-part)))
-                          new-tests)
-                        ())
-          log       (if display-run-time (print-run-time "Time - after create instances: %d:%d:%d" start-time) nil)
-          all-tests (concat tests-after old-tests)]
-      (when (seq old-tests)
-        ;; update existing tests with new values
-        (do
-          (doall (map (fn [[_ test-suite test]]
-                        (when (test-need-update? test-suite test)
-                          (update-sf-test client options test-suite (read-string (:id test)))))
-                      old-tests))
-          (when display-run-time (print-run-time "Time - after update tests: %d:%d:%d" start-time))))
-      ;; add any missing instances to the testset
-      (let [instances (ll-testset-instances client project-id (:id testset))
-            missing-tests (difference (set (map #(read-string (:id (last %))) (remove #(nil? (last %)) tests)))
-                                      (set (map #(get-in % [:attributes :test-id]) instances)))
-            instances (into [] (make-instances (:id testset) missing-tests))]
-        (do
-          (doall
-           (for [instances-part (partition-all 100 (shuffle instances))]
-             (ll-create-instances client [project-id display-action-logs] instances-part)))
-          (when display-run-time (print-run-time "Time - after create instances: %d:%d:%d" start-time))))
-      [testset all-tests])))
-
-
 (defn create-or-update-tests [[all-tests testset-id-to-name] client {:keys [project-id display-action-logs display-run-time] :as options} start-time]
   (let [new-tests  (into [] (group-test-names (vals all-tests) options))
         results    (doall

@@ -13,7 +13,6 @@
                                               create-instances
                                               create-runs]]
    [firecracker-report-parser.core    :refer [send-directory parse-files]]
-   [practitest-firecracker.utils      :refer [print-run-time]]
    [clojure.pprint                    :as     pprint]
    [clojure.java.io                   :refer [file]]
    [clj-time.core                     :as     t])
@@ -73,38 +72,16 @@
                 additional-reports))
               (exit 0 "Done"))
 
-            ;; "create-and-populate-testset"
-            ;; (do
-            ;;   (doall
-            ;;    (pmap
-            ;;     (fn [report]
-            ;;       (let [[testset all-tests] (timef
-            ;;                                  "create-or-update-testset"
-            ;;                                  (create-or-update-sf-testset client options report start-time))
-            ;;             log                  (if (:display-run-time options) (print-run-time "Time - after create-or-update-sf-testset: %d:%d:%d" start-time) nil)
-            ;;             runs                 (timef
-            ;;                                   "make-runs"
-            ;;                                   (make-runs client
-            ;;                                              (merge options
-            ;;                                                     {:skip-validation?   true})
-            ;;                                              all-tests))]
-            ;;         (when (:display-run-time options) (print-run-time "Time - after make-runs: %d:%d:%d" start-time))
-            ;;         (timef
-            ;;          "create-runs"
-            ;;          (doall (for [runs-part (partition-all 20 (shuffle runs))]
-            ;;                   (ll-create-runs client [(:project-id options) (:display-action-logs options)] runs-part))))
-            ;;         (when (:display-run-time options) (print-run-time "Time - Complete: %d:%d:%d" start-time))
-            ;;         (pprint/pprint (format "Populated TestSet ID: %s" (:id testset)))))
-            ;;     additional-reports))
-            ;;   (exit 0 (format "Done")))
-            "create-and-populate-testset"
+            "create-and-populate-testsets"
             (do
+              (timef
+               "create-and-populate-testsets"
               (-> (create-testsets client options additional-reports)
                   (group-tests client options)
                   (create-or-update-tests client options start-time)
                   (create-instances client options start-time)
                   (make-runs client options start-time)
-                  (create-runs client options start-time))
+                  (create-runs client options start-time)))
               (exit 0 (format "Done")))
             "test"
             (let [testset (create-or-update-sf-testset client options additional-reports additional-reports)]
