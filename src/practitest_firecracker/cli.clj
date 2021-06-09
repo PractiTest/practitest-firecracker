@@ -61,6 +61,8 @@
    [nil "--pt-test-step-name DSL"
     :parse-fn read-query
     :default (read-query "?test-case-name")]
+   [nil "--display-run-time" :default false]
+   [nil "--display-action-logs" :default false]
    ["-h" "--help"]])
 
 (defn usage [options-summary]
