@@ -142,7 +142,7 @@
         :else
         {:action "populate-testset" :options options})
 
-      (= "create-and-populate-testsets" (first arguments))
+      (= "create-and-populate-testset" (first arguments))
       (cond
         (nil? (:project-id options))
         {:exit-message (missing-option-msg "create-and-populate-testset" "project-id")}
@@ -154,7 +154,7 @@
         {:exit-message (missing-option-msg "create-and-populate-testset" "testset-name")}
 
         :else
-        {:action "create-and-populate-testsets" :options options})
+        {:action "create-and-populate-testset" :options options})
 
       :else
       {:exit-message (format "\nUnsupported action [%s]\n\n%s" (first arguments) (usage summary))})))

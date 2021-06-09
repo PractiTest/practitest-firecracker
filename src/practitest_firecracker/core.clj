@@ -70,14 +70,14 @@
                 additional-reports))
               (exit 0 "Done"))
 
-            "create-and-populate-testsets"
+            "create-and-populate-testset"
             (do
               (timef
-               "create-and-populate-testsets"
-              (-> (create-testsets client options additional-reports)
-                  (group-tests client options)
-                  (create-or-update-tests client options start-time)
-                  (create-instances client options start-time)
-                  (make-runs client options start-time)
-                  (create-runs client options start-time)))
+               "create-and-populate-testset"
+               (-> (create-testsets client options additional-reports)
+                   (group-tests client options)
+                   (create-or-update-tests client options start-time)
+                   (create-instances client options start-time)
+                   (make-runs client options start-time)
+                   (create-runs client options start-time)))
               (exit 0 (format "Done"))))))))
