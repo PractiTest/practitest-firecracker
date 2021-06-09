@@ -5,8 +5,6 @@
                                               create-sf-testset
                                               make-runs
                                               populate-sf-results
-                                              create-or-update-sf-testset
-                                              ll-create-runs
                                               create-testsets
                                               group-tests
                                               create-or-update-tests
