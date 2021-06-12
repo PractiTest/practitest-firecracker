@@ -124,13 +124,14 @@
                 :uri          uri
                 :method       (max-api-rate-throttler http/get)}))))
 
-(defn ll-testset-instances [{:keys [base-uri credentials max-api-rate-throttler]} project-id testset-id]
+(defn ll-testset-instances [{:keys [base-uri credentials max-api-rate-throttler]} project-id testset-id test-ids]
   (log/infof "create instances %s" testset-id)
   (let [uri (build-uri base-uri testset-instances-uri project-id)]
     (api-call {:credentials  credentials
                :uri          uri
                :method       (max-api-rate-throttler http/get)
-               :query-params {:set-ids testset-id}})))
+               :query-params {:set-ids testset-id
+                              :test-ids test-ids}})))
 
 (defn ll-test [{:keys [base-uri credentials max-api-rate-throttler]} project-id id]
   ;; (log/infof "create step %s" id)
@@ -170,15 +171,12 @@
                                       :attributes attributes
                                       :instances  {:test-ids test-ids}}}}))))
 
-(defn make-instances [testset-ids-to-tests tests]
-  (filter #(some? %)
-          (for [test tests
-                testset testset-ids-to-tests]
-            (let [ts (first testset)]
-              (when (contains? (last ts) (first test))
-                {:type       "instances"
-                 :attributes {:set-id (first testset)
-                              :test-id (:id (last test))}})))))
+(defn make-instances [testset-tests]
+  (for [[testset-id test-ids] testset-tests]
+    (for [test-id test-ids]
+      {:type       "instances"
+       :attributes {:set-id testset-id
+                    :test-id test-id}})))
 
 (defn ll-create-instance [{:keys [base-uri credentials max-api-rate-throttler]} project-id testset-id test-id]
   ;; (log/infof "create instance for testset-id %s and test-id %s" testset-id test-id)
@@ -198,11 +196,10 @@
 (defn ll-create-instances [{:keys [base-uri credentials max-api-rate-throttler]} [project-id display-action-logs] instances]
   (when display-action-logs (log/infof "create instances"))
   (let [uri (build-uri base-uri create-instance-uri project-id)]
-    (first
-     (api-call {:credentials  credentials
-                :uri          uri
-                :method       (max-api-rate-throttler http/post)
-                :form-params  {:data instances}}))))
+    (api-call {:credentials  credentials
+               :uri          uri
+               :method       (max-api-rate-throttler http/post)
+               :form-params  {:data instances}})))
 
 (defn ll-create-run [{:keys [base-uri credentials max-api-rate-throttler]} [project-id display-action-logs] instance-id attributes steps]
   (when display-action-logs (log/infof "create run for instance %s" instance-id))
@@ -475,22 +472,17 @@
   [{:run-duration (:time-elapsed test-suite)}
    (map (partial sf-test-case->run-step-def options) (:test-cases test-suite))])
 
-(defn make-runs [[tests testset-id-to-name] client {:keys [project-id display-action-logs] :as options} start-time]
-  (when display-action-logs (log/infof "make-runs %d suites" (count tests)))
-  (filter #(some? %)
-          (doall
-           (for [test tests
-                 testset testset-id-to-name]
-             (let [ts (first testset)
-                   testset-id (first ts)
-                   contains-tests (last ts)]
-               (when (contains? contains-tests (first test))
-                 (let [instance        (ll-find-instance client [project-id display-action-logs] testset-id (:id (last test)))
-                       [run run-steps] (sf-test-suite->run-def options (get test 1))]
-                   {:instance-id (:id instance)
-                    :attributes run
-                    :steps run-steps
-            })))))))
+(defn make-runs [[test-by-id instance-to-ts-test] client {:keys [project-id display-action-logs] :as options} start-time]
+  (when display-action-logs (log/infof "make-runs"))
+  (flatten (doall
+            (for [[test-testset instances] instance-to-ts-test]
+              (for [instance instances]
+                (let [[ts-id test-id] test-testset
+                      tst (first (get test-by-id test-id))
+                      [run run-steps] (sf-test-suite->run-def options (get tst 1))]
+                  {:instance-id (:id instance)
+                   :attributes run
+                   :steps run-steps}))))))
 
 (defn populate-sf-results [client {:keys [project-id testset-id display-action-logs] :as options} sf-test-suites]
   (when display-action-logs (log/infof "populating testset %s with results from %d suites" testset-id (count sf-test-suites)))
@@ -521,14 +513,14 @@
        {(:id testset) (:test-list sf-test-suites)}))))
 
 (defn group-tests [testsets client options]
-  (let [testset-id-testnames (map (fn [[k v]]
+  (let [testset-id-to-name (map (fn [[k v]]
                                     {k (set (map
                                              (fn [test] (sf-test-suite->pt-test-name options test)) v))})
                                   (into {} testsets))
         tests                (flatten (map val (into {} testsets)))
         all-tests            (doall (into {} (for [test tests]
                                                {(sf-test-suite->pt-test-name options test) test})))]
-    [all-tests testset-id-testnames]))
+    [all-tests testset-id-to-name]))
 
 (defn create-or-update-tests [[all-tests testset-id-to-name] client {:keys [project-id display-action-logs display-run-time] :as options} start-time]
   (let [new-tests  (into [] (group-test-names (vals all-tests) options))
@@ -564,22 +556,33 @@
     [new-all-tests testset-id-to-name]))
 
 (defn create-instances [[all-tests testset-id-to-name] client {:keys [project-id display-action-logs display-run-time] :as options} start-time]
-  (let [testset-ids   (map (fn [testset] (first (first testset))) testset-id-to-name)
-        ts-ids        (string/join "," testset-ids)
-        instances     (doall (ll-testset-instances client project-id ts-ids))
-        missing-tests (difference (set (map #(read-string (:id (last %))) (remove #(nil? (last %)) all-tests)))
-                                  (set (map #(get-in % [:attributes :test-id]) instances)))
-        missing-t     (filter #(some? %)
-                              (map (fn [test]
-                                     (let [test-id (parse-id (:id (last test)))]
-                                       (when
-                                           (contains? missing-tests test-id)
-                                         test)))
-                                   all-tests))
-        make-instances (into [] (make-instances testset-id-to-name missing-t))]
-    (do
-      (doall
-       (for [instances-part (partition-all 100 (shuffle make-instances))]
-         (ll-create-instances client [project-id display-action-logs] instances-part)))
-      (when display-run-time (print-run-time "Time - after create instances: %d:%d:%d" start-time)))
-    [all-tests testset-id-to-name]))
+  (let [all-test-ids    (map (fn [test] (:id (last test))) all-tests)
+        testname-test   (into {} (map (fn [test] {(first test) test}) all-tests))
+        test-ids        (string/join "," all-test-ids)
+        testset-ids     (map (fn [testset] (first (first testset))) testset-id-to-name)
+        ts-ids          (string/join "," testset-ids)
+        instances       (ll-testset-instances client project-id ts-ids test-ids)
+
+        ts-id-tests     (into {} (map (fn [testset-id-name]
+                                      {(first (first testset-id-name))
+                                       (filter #(some? %)
+                                                        (map (fn [test-name]
+                                                               (get testname-test test-name))
+                                                             (last (last testset-id-name))))})
+                                      testset-id-to-name))
+
+        ts-id-instances (group-by (fn [inst] (get-in inst [:attributes :set-id])) instances)
+
+        missing-tests  (into {}
+                             (doall
+                              (for [ts-id (into () testset-ids)]
+                                {ts-id (difference (set (map #(read-string (:id (last %))) (remove #(nil? (last %)) (get ts-id-tests ts-id))))
+                                                   (set (map #(get-in % [:attributes :test-id]) (get ts-id-instances (read-string ts-id)))))})))
+        make-instances (flatten (make-instances missing-tests))
+        test-by-id     (group-by (fn [test] (read-string (:id (last test)))) all-tests)
+        new-intstances (first (for [instances-part (partition-all 100 (shuffle make-instances))]
+                                  (ll-create-instances client [project-id display-action-logs] instances-part)))
+        all-intstances (into [] (concat new-intstances instances))
+        instance-to-ts-test (group-by (fn [inst] [(:set-id (:attributes inst)) (:test-id (:attributes inst))]) all-intstances)]
+      (when display-run-time (print-run-time "Time - after create instances: %d:%d:%d" start-time))
+      [test-by-id instance-to-ts-test]))

@@ -79,5 +79,6 @@
                    (create-or-update-tests client options start-time)
                    (create-instances client options start-time)
                    (make-runs client options start-time)
-                   (create-runs client options start-time)))
+                   (create-runs client options start-time)
+                   ))
               (exit 0 (format "Done"))))))))
