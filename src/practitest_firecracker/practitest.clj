@@ -124,7 +124,7 @@
                 :uri          uri
                 :method       (max-api-rate-throttler http/get)}))))
 
-(defn ll-testset-instances [{:keys [base-uri credentials max-api-rate-throttler]} [display-action-logs project-id] testset-id test-ids]
+(defn ll-testset-instances [{:keys [base-uri credentials max-api-rate-throttler]} [project-id display-action-logs] testset-id test-ids]
   (when display-action-logs (log/infof "get instances from testsets %s" testset-id))
   (let [uri (build-uri base-uri testset-instances-uri project-id)]
     (api-call {:credentials  credentials
