@@ -8,7 +8,7 @@
          org.clojure/tools.logging                        {:mvn/version "1.1.0"}
          ch.qos.logback/logback-classic                   {:mvn/version "1.2.3"}
          clj-time/clj-time                                {:mvn/version "0.15.2"}
-         github-PractiTest/firecracker-report-parser      {:git/url "git@github.com:PractiTest/firecracker-report-parser.git" :deps/manifest :deps :sha "d82f161c2df645162b4ce69ea0800b222e91698a"}
+         github-PractiTest/firecracker-report-parser      {:git/url "git@github.com:PractiTest/firecracker-report-parser.git" :deps/manifest :deps :sha "a4134a125e8e2259d7fa64fd7c1b1df7e7ca8564"}
          }
  :aliases
  {:dev       {:extra-paths ["dev"]}
