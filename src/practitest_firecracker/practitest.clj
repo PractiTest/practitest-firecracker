@@ -124,8 +124,8 @@
                 :uri          uri
                 :method       (max-api-rate-throttler http/get)}))))
 
-(defn ll-testset-instances [{:keys [base-uri credentials max-api-rate-throttler]} project-id testset-id test-ids]
-  (log/infof "create instances %s" testset-id)
+(defn ll-testset-instances [{:keys [base-uri credentials max-api-rate-throttler]} [display-action-logs project-id] testset-id test-ids]
+  (when display-action-logs (log/infof "get instances from testsets %s" testset-id))
   (let [uri (build-uri base-uri testset-instances-uri project-id)]
     (api-call {:credentials  credentials
                :uri          uri
@@ -317,7 +317,7 @@
 
 (defn testset [client project-id id]
   (let [testset   (ll-testset client project-id id)
-        instances (ll-testset-instances client project-id id)
+        instances (ll-testset-instances client [project-id true] id)
         tests     (->> instances
                        (map #(get-in % [:attributes :test-id]))
                        (remove nil?)
@@ -441,7 +441,7 @@
   ;; check that all tests exist in the given testset
   ;; if not -- throw exception, the user will need to create another testset
   ;; otherwise -- go on
-  (let [instances (ll-testset-instances client project-id testset-id)
+  (let [instances (ll-testset-instances client [project-id display-action-logs] testset-id)
         tests     (map (fn [test-suite]
                          (let [name (:name test-suite)]
                            [name (ll-find-test client [project-id display-action-logs] name)]))
@@ -461,9 +461,9 @@
   {:name           (sf-test-case->pt-step-name options test-case)
    :actual-results (str (:failure-message test-case) \newline (:failure-detail test-case))
    :status         (case (:failure-type test-case)
-                     "failure" "FAILED"
-                     "skipped" "N/A"
-                     "error"   "FAILED"
+                     :failure "FAILED"
+                     :skipped "N/A"
+                     :error   "FAILED"
                      ;; will leave error as FAILED for now, will change it after we add the UI changes and add the option of ERROR to Reqirement Test and TestSet table of runs
                      nil       "PASSED"
                      "NO RUN")})
@@ -561,7 +561,7 @@
         test-ids        (string/join "," all-test-ids)
         testset-ids     (map (fn [testset] (first (first testset))) testset-id-to-name)
         ts-ids          (string/join "," testset-ids)
-        instances       (ll-testset-instances client project-id ts-ids test-ids)
+        instances       (ll-testset-instances client [project-id display-action-logs] ts-ids test-ids)
 
         ts-id-tests     (into {} (map (fn [testset-id-name]
                                       {(first (first testset-id-name))
@@ -580,7 +580,7 @@
                                                    (set (map #(get-in % [:attributes :test-id]) (get ts-id-instances (read-string ts-id)))))})))
         make-instances (flatten (make-instances missing-tests))
         test-by-id     (group-by (fn [test] (read-string (:id (last test)))) all-tests)
-        new-intstances (first (for [instances-part (partition-all 100 (shuffle make-instances))]
+        new-intstances (flatten (for [instances-part (partition-all 100 (shuffle make-instances))]
                                   (ll-create-instances client [project-id display-action-logs] instances-part)))
         all-intstances (into [] (concat new-intstances instances))
         instance-to-ts-test (group-by (fn [inst] [(:set-id (:attributes inst)) (:test-id (:attributes inst))]) all-intstances)]
