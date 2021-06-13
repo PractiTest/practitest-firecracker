@@ -61,6 +61,7 @@ java -jar practitest-firecracker-standalone.jar \
     --config-path=CONFIG_FILE \
     create-and-populate-testset
 ```
+* In the future config files --testset-name will be defined inside of the config file so there will be no need to define it in the command line
 ### use Firecracker without config file
 
 You can use all the above commands without the config file. You will need to explicitly define
