@@ -582,7 +582,6 @@
                                (for [ts-id (into () testset-ids)]
                                  {ts-id (merge-with -
                                                     (get ts-id-instance-num ts-id)
-                                                    ;; (frequencies (vec (map #(read-string (:id (last %))) (remove #(nil? (last %)) (get ts-id-tests ts-id)))))
                                                     (frequencies (vec (map #(get-in % [:attributes :test-id]) (get ts-id-instances (read-string ts-id))))))})))
         make-instances  (flatten (make-instances missing-tests))
         test-by-id      (group-by (fn [test] (read-string (:id (last test)))) all-tests)
