@@ -47,20 +47,22 @@
     "JSON containing the fields that should be added when creating PractiTest TestSet"
     :default {}
     :parse-fn parse-additional-fields]
-   [nil "--test-case-as-pt-test" :default true]
-   [nil "--test-case-as-pt-test-step" :default false]
+   ;; [nil "--test-case-as-pt-test" :default true]
+   [nil "--test-case-as-pt-test-step" :default true]
    #_[nil "--pt-test-name DSL"
     :parse-fn read-query
     :default (read-query "(concat (join (capitalize (drop 2 (tokenize-package ?package-name)))) \": \" (join (capitalize (drop-last (tokenize-class-name ?test-suite-name)))))")]
    [nil "--pt-test-name DSL"
     :parse-fn read-query
-    :default (read-query "?test-suite-name")]
+    :default (read-query "?pt-test-name")]
    #_[nil "--pt-test-step-name DSL"
     :parse-fn read-query
     :default (read-query "(join (capitalize (tokenize-class-name ?test-case-name)))")]
    [nil "--pt-test-step-name DSL"
     :parse-fn read-query
     :default (read-query "?test-case-name")]
+   [nil "--display-run-time" :default false]
+   [nil "--display-action-logs" :default false]
    ["-h" "--help"]])
 
 (defn usage [options-summary]
@@ -115,19 +117,19 @@
         :else
         {:action "display-options" :options options})
 
-      (= "create-testset" (first arguments))
-      (cond
-        (nil? (:project-id options))
-        {:exit-message (missing-option-msg "create-testset" "project-id")}
+      ;; (= "create-testset" (first arguments))
+      ;; (cond
+      ;;   (nil? (:project-id options))
+      ;;   {:exit-message (missing-option-msg "create-testset" "project-id")}
 
-        (nil? (:author-id options))
-        {:exit-message (missing-option-msg "create-testset" "author-id")}
+      ;;   (nil? (:author-id options))
+      ;;   {:exit-message (missing-option-msg "create-testset" "author-id")}
 
-        (nil? (:testset-name options))
-        {:exit-message (missing-option-msg "create-testset" "testset-name")}
+      ;;   (nil? (:testset-name options))
+      ;;   {:exit-message (missing-option-msg "create-testset" "testset-name")}
 
-        :else
-        {:action "create-testset" :options options})
+      ;;   :else
+      ;;   {:action "create-testset" :options options})
 
       (= "populate-testset" (first arguments))
       (cond
@@ -148,7 +150,7 @@
         (nil? (:author-id options))
         {:exit-message (missing-option-msg "create-and-populate-testset" "author-id")}
 
-        (nil? (:testset-name options))
+        (and (nil? (:testset-name options)) (not (:multitestset options)))
         {:exit-message (missing-option-msg "create-and-populate-testset" "testset-name")}
 
         :else

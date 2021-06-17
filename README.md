@@ -61,6 +61,7 @@ java -jar practitest-firecracker-standalone.jar \
     --config-path=CONFIG_FILE \
     create-and-populate-testset
 ```
+* In the future config files --testset-name will be defined inside of the config file so there will be no need to define it in the command line
 ### use Firecracker without config file
 
 You can use all the above commands without the config file. You will need to explicitly define
@@ -91,6 +92,26 @@ java -jar practitest-firecracker-standalone.jar \
 You can set various custom fields for tests when they are created (especially useful if you have mandatory fields configured in your tests).
 
 Replace the field ids with the actual IDs, you can see all your custom fields by calling this API call: [get-all-custom-fields-in-your-project](https://www.practitest.com/api-v2/#get-all-custom-fields-in-your-project)
+
+### Additional options
+If you want to use firecracker custom uris you will need to add this --api-uri parameter like this
+for stage:
+--api-uri=https://stage.practitest.com/
+for EU:
+--api-uri=https://eu1-prod-api.practitest.app
+for local:
+--api-uri=http://localhost:PORT_NUM
+
+To display action logs like create/update etc. add --display-action-logs=true (it will make the run slower so only add it for manual runs)
+
+In case you have very big xml test results and it take very long time for firecracker to complete add --max-api-rate=NUM (the default is 30)
+!!!important!!! make sure that you add the same limit to of api rate limit to your account.
+
+In case you want the name of the test to take its value from other attribute of testcase(s) add this parameter --pt-test-name=?ATTRIBUTE for example --pt-test-name=?full-class-name you can see the values that acceptable in firecracker UI (default is ?pt-test-name)
+
+Same goes for --pt-test-step-name that will define the name of the steps.
+
+For more information contact our support.
 
 ## License
 
