@@ -12,7 +12,7 @@
 
 ;; ===========================================================================
 ;; api version
-(def ^:const fc-version "2.0.0")
+(def ^:const fc-version "2.0.2")
 
 ;; ===========================================================================
 ;; utils
@@ -104,6 +104,11 @@
 (def ^:const list-testsets-uri "/projects/%d/sets.json")
 (def ^:const custom-field-uri "/projects/%d/custom_fields/%d.json")
 
+;; Used when we get testset instances for multiple test ids
+;; It's a GET request, so if we pass too many test IDs, we get the "URL too long" error
+;; 50 sounds like a good compromise.
+
+(def ^:const max-test-ids-bucket 50)
 ;; ===========================================================================
 ;; API
 
@@ -130,8 +135,8 @@
     (api-call {:credentials  credentials
                :uri          uri
                :method       (max-api-rate-throttler http/get)
-               :query-params {:set-ids testset-id
-                              :test-ids test-ids}})))
+               :query-params (cond-> {:set-ids testset-id}
+                               test-ids (assoc :test-ids test-ids))})))
 
 (defn ll-test [{:keys [base-uri credentials max-api-rate-throttler]} project-id id]
   ;; (log/infof "create step %s" id)
@@ -318,7 +323,7 @@
 
 (defn testset [client project-id id]
   (let [testset   (ll-testset client project-id id)
-        instances (ll-testset-instances client [project-id true] id)
+        instances (ll-testset-instances client [project-id true] id nil)
         tests     (->> instances
                        (map #(get-in % [:attributes :test-id]))
                        (remove nil?)
@@ -442,7 +447,7 @@
   ;; check that all tests exist in the given testset
   ;; if not -- throw exception, the user will need to create another testset
   ;; otherwise -- go on
-  (let [instances (ll-testset-instances client [project-id display-action-logs] testset-id)
+  (let [instances (ll-testset-instances client [project-id display-action-logs] testset-id nil)
         tests     (map (fn [test-suite]
                          (let [name (:name test-suite)]
                            [name (ll-find-test client [project-id display-action-logs] name)]))
@@ -561,33 +566,36 @@
     [new-all-tests testset-id-to-name ts-id-test-name-num-instances]))
 
 (defn create-instances [[all-tests testset-id-to-name ts-id-test-name-num-instances] client {:keys [project-id display-action-logs display-run-time] :as options} start-time]
-  (let [all-test-ids    (map (fn [test] (:id (last test))) all-tests)
-        testname-test   (into {} (map (fn [test] {(first test) test}) all-tests))
-        test-ids        (string/join "," all-test-ids)
-        testset-ids     (map (fn [testset] (first (first testset))) testset-id-to-name)
-        ts-ids          (string/join "," testset-ids)
-        instances       (ll-testset-instances client [project-id display-action-logs] ts-ids test-ids)
+  (let [all-test-ids       (map (fn [test] (:id (last test))) all-tests)
+        testname-test      (into {} (map (fn [test] {(first test) test}) all-tests))
+        testset-ids        (map (fn [testset] (first (first testset))) testset-id-to-name)
+        ts-ids             (string/join "," testset-ids)
+        instances          (mapcat (fn [test-ids-bucket]
+                                     (ll-testset-instances client
+                                                           [project-id display-action-logs]
+                                                           ts-ids
+                                                           (string/join "," test-ids-bucket)))
+                                   (partition-all max-test-ids-bucket all-test-ids))
+        ts-id-instance-num (into {} (map (fn [testset-id-name]
+                                           {(first (first testset-id-name))
+                                            (into {} (map (fn [test-name]
+                                                            {(read-string (:id (last (get testname-test test-name))))
+                                                             (get (get ts-id-test-name-num-instances (first (first testset-id-name))) test-name)})
+                                                          (last (last testset-id-name))))})
+                                         testset-id-to-name))
+        ts-id-instances    (group-by (fn [inst] (get-in inst [:attributes :set-id])) instances)
 
-        ts-id-instance-num   (into {} (map (fn [testset-id-name]
-                                             {(first (first testset-id-name))
-                                              (into {} (map (fn [test-name]
-                                                     {(read-string (:id (last (get testname-test test-name))))
-                                                      (get (get ts-id-test-name-num-instances (first (first testset-id-name))) test-name)})
-                                                   (last (last testset-id-name))))})
-                                           testset-id-to-name))
-        ts-id-instances (group-by (fn [inst] (get-in inst [:attributes :set-id])) instances)
-
-        missing-tests   (into {}
-                              (doall
-                               (for [ts-id (into () testset-ids)]
-                                 {ts-id (merge-with -
-                                                    (get ts-id-instance-num ts-id)
-                                                    (frequencies (vec (map #(get-in % [:attributes :test-id]) (get ts-id-instances (read-string ts-id))))))})))
-        make-instances  (flatten (make-instances missing-tests))
-        test-by-id      (group-by (fn [test] (read-string (:id (last test)))) all-tests)
-        new-intstances  (flatten (for [instances-part (partition-all 100 (shuffle make-instances))]
-                                   (ll-create-instances client [project-id display-action-logs] instances-part)))
-        all-intstances  (into [] (concat new-intstances instances))
+        missing-tests       (into {}
+                                  (doall
+                                    (for [ts-id (into () testset-ids)]
+                                      {ts-id (merge-with -
+                                                         (get ts-id-instance-num ts-id)
+                                                         (frequencies (vec (map #(get-in % [:attributes :test-id]) (get ts-id-instances (read-string ts-id))))))})))
+        make-instances      (flatten (make-instances missing-tests))
+        test-by-id          (group-by (fn [test] (read-string (:id (last test)))) all-tests)
+        new-intstances      (flatten (for [instances-part (partition-all 100 (shuffle make-instances))]
+                                       (ll-create-instances client [project-id display-action-logs] instances-part)))
+        all-intstances      (into [] (concat new-intstances instances))
         instance-to-ts-test (group-by (fn [inst] [(:set-id (:attributes inst)) (:test-id (:attributes inst))]) all-intstances)]
       (when display-run-time (print-run-time "Time - after create instances: %d:%d:%d" start-time))
       [test-by-id instance-to-ts-test]))
