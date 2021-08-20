@@ -108,7 +108,7 @@
 ;; It's a GET request, so if we pass too many test IDs, we get the "URL too long" error
 ;; 50 sounds like a good compromise.
 
-(def ^:const max-test-ids-bucket 50)
+(def ^:const max-test-ids-bucket-size 50)
 ;; ===========================================================================
 ;; API
 
@@ -575,7 +575,7 @@
                                                            [project-id display-action-logs]
                                                            ts-ids
                                                            (string/join "," test-ids-bucket)))
-                                   (partition-all max-test-ids-bucket all-test-ids))
+                                   (partition-all max-test-ids-bucket-size all-test-ids))
         ts-id-instance-num (into {} (map (fn [testset-id-name]
                                            {(first (first testset-id-name))
                                             (into {} (map (fn [test-name]
