@@ -1,15 +1,16 @@
 {:paths ["src" "test"]
- :deps  {org.clojure/clojure                              {:mvn/version "1.10.3"}
-         org.clojure/tools.cli                            {:mvn/version "1.0.194"}
-         org.clojure/core.async                           {:mvn/version "1.2.603"}
-         cheshire/cheshire                                {:mvn/version "5.10.0"}
-         clj-http/clj-http                                {:mvn/version "3.12.0"}
-         throttler/throttler                              {:mvn/version "1.0.0"}
-         org.clojure/tools.logging                        {:mvn/version "1.1.0"}
-         ch.qos.logback/logback-classic                   {:mvn/version "1.2.3"}
-         clj-time/clj-time                                {:mvn/version "0.15.2"}
-         github-PractiTest/firecracker-report-parser      {:git/url "git@github.com:PractiTest/firecracker-report-parser.git" :deps/manifest :deps :sha "9fed1ab43b42f1b6d426925eaf159e620e793c56"}
-         }
+ :deps  {org.clojure/clojure                         {:mvn/version "1.10.3"}
+         org.clojure/tools.cli                       {:mvn/version "1.0.194"}
+         org.clojure/core.async                      {:mvn/version "1.2.603"}
+         cheshire/cheshire                           {:mvn/version "5.10.0"}
+         clj-http/clj-http                           {:mvn/version "3.12.0"}
+         throttler/throttler                         {:mvn/version "1.0.0"}
+         org.clojure/tools.logging                   {:mvn/version "1.1.0"}
+         ch.qos.logback/logback-classic              {:mvn/version "1.2.3"}
+         clj-time/clj-time                           {:mvn/version "0.15.2"}
+         github-PractiTest/firecracker-report-parser {:git/url       "git@github.com:PractiTest/firecracker-report-parser.git"
+                                                      :deps/manifest :deps
+                                                      :sha           "9fed1ab43b42f1b6d426925eaf159e620e793c56"}}
  :aliases
  {:dev       {:extra-paths ["dev"]}
   :package   {:extra-paths ["resources" "target/cljs/"]}
@@ -18,6 +19,4 @@
               :main-opts  ["-m" "uberdeps.uberjar"]}
   :depstar   {:extra-deps
               {seancorfield/depstar {:mvn/version "1.0.94"}}}
-  :webassets {:extra-paths ["dev"]}
-  }
- }
+  :webassets {:extra-paths ["dev"]}}}
