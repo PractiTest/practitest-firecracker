@@ -184,7 +184,7 @@
 
 (defn ll-create-instance [{:keys [base-uri credentials max-api-rate-throttler]} project-id testset-id test-id]
   ;; (log/infof "create instance for testset-id %s and test-id %s" testset-id test-id)
-  (let [uri (build-uri base-uri create-instance-uri project-id)]
+  (let [uri (build-uri base-uri create-instance-uri (parse-id project-id))]
     (first
      (api-call {:credentials  credentials
                 :uri          uri
@@ -199,7 +199,7 @@
 
 (defn ll-create-instances [{:keys [base-uri credentials max-api-rate-throttler]} [project-id display-action-logs] instances]
   (when display-action-logs (log/infof "create instances"))
-  (let [uri (build-uri base-uri create-instance-uri project-id)]
+  (let [uri (build-uri base-uri create-instance-uri (parse-id project-id))]
     (api-call {:credentials  credentials
                :uri          uri
                :method       (max-api-rate-throttler http/post)
@@ -207,7 +207,7 @@
 
 (defn ll-create-run [{:keys [base-uri credentials max-api-rate-throttler]} [project-id display-action-logs] instance-id attributes steps]
   (when display-action-logs (log/infof "create run for instance %s" instance-id))
-  (let [uri (build-uri base-uri create-run-uri project-id)]
+  (let [uri (build-uri base-uri create-run-uri (parse-id project-id))]
     (first
      (api-call {:credentials  credentials
                 :uri          uri
@@ -218,7 +218,7 @@
 
 (defn ll-create-runs [{:keys [base-uri credentials max-api-rate-throttler] :as client} [project-id display-action-logs] runs]
   (when display-action-logs (log/infof "create runs"))
-  (let [uri (build-uri base-uri create-run-uri project-id)]
+  (let [uri (build-uri base-uri create-run-uri (parse-id project-id))]
     (if (has-duplicates? :instance-id runs)
       (let [grouped    (group-by :instance-id runs)
             duplicates (map first (vals (into {} (filter #(> (count (last %)) 1) grouped))))
@@ -244,7 +244,7 @@
 
 (defn ll-find-tests [{:keys [base-uri credentials max-api-rate-throttler]} [project-id display-action-logs] name-list]
   (when display-action-logs (log/infof "searching for testsets"))
-  (let [uri (build-uri base-uri bulk-list-tests-uri project-id)]
+  (let [uri (build-uri base-uri bulk-list-tests-uri (parse-id project-id))]
     (api-call {:credentials  credentials
                :uri          uri
                :method       (max-api-rate-throttler http/post)
@@ -252,7 +252,7 @@
 
 (defn ll-find-test [{:keys [base-uri credentials max-api-rate-throttler]} [project-id display-action-logs] name]
   (when display-action-logs (log/infof "searching for test %s" name))
-  (let [uri (build-uri base-uri list-tests-uri project-id)]
+  (let [uri (build-uri base-uri list-tests-uri (parse-id project-id))]
     ;; in case there are more than one test with this name, return the first one
     (first
      (api-call {:credentials  credentials
@@ -281,7 +281,7 @@
 
 (defn ll-get-custom-field [{:keys [base-uri credentials max-api-rate-throttler]} [project-id display-action-logs] cf-id]
   (when display-action-logs (log/infof "searching custom field %s" cf-id))
-  (let [uri (build-uri base-uri custom-field-uri project-id cf-id)]
+  (let [uri (build-uri base-uri custom-field-uri (parse-id project-id) (parse-id cf-id))]
     (first
      (api-call {:credentials  credentials
                 :uri          uri
@@ -289,7 +289,7 @@
 
 (defn ll-update-custom-field [{:keys [base-uri credentials max-api-rate-throttler]} [project-id display-action-logs] cf-id possible-values]
   (when display-action-logs (log/infof "update custom field %s to possible-values: %s" cf-id possible-values))
-  (let [uri (build-uri base-uri custom-field-uri project-id cf-id)]
+  (let [uri (build-uri base-uri custom-field-uri (parse-id project-id) (parse-id cf-id))]
     (first
      (api-call {:credentials  credentials
                 :uri          uri
@@ -299,7 +299,7 @@
 
 (defn ll-update-test [{:keys [base-uri credentials max-api-rate-throttler]} [project-id display-action-logs] attributes steps cf-id]
   (when display-action-logs (log/infof "update test %s in custom field id %s" (:name attributes) cf-id))
-  (let [uri (build-uri base-uri update-test-uri project-id cf-id)]
+  (let [uri (build-uri base-uri update-test-uri (parse-id project-id) (parse-id cf-id))]
     (first
      (api-call {:credentials  credentials
                 :uri          uri
@@ -310,7 +310,7 @@
 
 (defn ll-update-testset [{:keys [base-uri credentials max-api-rate-throttler]} [project-id display-action-logs] attributes steps cf-id]
   (when display-action-logs (log/infof "update testset %s in field id %s" (:name attributes) cf-id))
-  (let [uri (build-uri base-uri update-testset-uri project-id cf-id)]
+  (let [uri (build-uri base-uri update-testset-uri (parse-id project-id) (parse-id cf-id))]
     (first
      (api-call {:credentials  credentials
                 :uri          uri
