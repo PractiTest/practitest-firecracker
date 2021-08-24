@@ -5,21 +5,23 @@
    [practitest-firecracker.practitest :as SUT]))
 
 (defn prepare-mocks [f]
-  (with-fake-routes-in-isolation
-    {"https://fake-api.local/api/v2/projects/1234567891/tests/bulk_search.json"
-     {:post (fn [req]
-              (println (pr-str req))
-              {:status 200
-               :headers {"Content-Type" "application/json"}
-               :body "[]"})}}
-    (f)))
+  (with-redefs [SUT/backoff-timeout 1
+                SUT/max-attempts 1]
+    (with-fake-routes-in-isolation
+      {"https://fake-api.local/api/v2/projects/1234567891/tests/bulk_search.json"
+       {:post (fn [req]
+                (println (pr-str req))
+                {:status  429 
+                 :headers {"Content-Type" "application/json"}
+                 :body    "[]"})}}
+      (f))))
 
-(use-fixtures :each prepare-mocks)
+(use-fixtures :each #'prepare-mocks)
 
 (deftest ll-find-tests
   (let [client (SUT/make-client {:email        "foo@example.com"
                                  :api-token    "whatever"
                                  :api-uri      "https://fake-api.local"
                                  :max-api-rate 1})
-        ress (doall (repeatedly 10 #(SUT/ll-find-tests client [1234567891 true] ["one" "two" "three"])))]
+        ress (SUT/ll-find-tests client [1234567891 true] ["one" "two" "three"])]
     (is (empty? ress))))
