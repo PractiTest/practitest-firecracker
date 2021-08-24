@@ -12,7 +12,8 @@
                                                       :deps/manifest :deps
                                                       :sha           "9fed1ab43b42f1b6d426925eaf159e620e793c56"}}
  :aliases
- {:dev       {:extra-paths ["dev"]}
+ {:dev       {:extra-paths ["dev"]
+              :extra-deps  {clj-http-fake/clj-http-fake {:mvn/version "1.0.3"}}}
   :package   {:extra-paths ["resources" "target/cljs/"]}
   :nrepl     {:extra-deps {nrepl/nrepl {:mvn/version "0.6.0"}}}
   :uberdeps  {:extra-deps {uberdeps/uberdeps {:mvn/version "0.1.8"}}
