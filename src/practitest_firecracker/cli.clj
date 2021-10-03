@@ -87,11 +87,14 @@
   (format "%s is required for '%s' action" option-name action-name))
 
 (defn parse-config-file [options]
-  (let [parsed-json    (json/parse-stream (reader (:config-path options)) true)
-        new-additional-test-fields  (parse-additional-fields (json/generate-string (:additional-test-fields parsed-json)))
+  (let [parsed-json                   (json/parse-stream (reader (:config-path options)) true)
+        new-additional-test-fields    (parse-additional-fields (json/generate-string (:additional-test-fields parsed-json)))
         new-additional-testset-fields (parse-additional-fields (json/generate-string (:additional-testset-fields parsed-json)))
-        new-parsed-json    (merge parsed-json {:additional-testset-fields new-additional-testset-fields
-                                               :additional-test-fields new-additional-test-fields})]
+        new-parsed-json               (merge parsed-json
+                                             (when (:additional-testset-fields parsed-json) {:additional-testset-fields new-additional-testset-fields})
+                                             (when (:additional-test-fields parsed-json) {:additional-test-fields new-additional-test-fields})
+                                             (when (:pt-test-name parsed-json) {:pt-test-name (read-query (:pt-test-name parsed-json))})
+                                             (when (:pt-test-step-name parsed-json) {:pt-test-step-name (read-query (:pt-test-step-name parsed-json))}))]
     new-parsed-json))
 
 (defn parse-args [args]
