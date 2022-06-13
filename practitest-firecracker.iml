@@ -29,7 +29,6 @@
     <orderEntry type="library" name="Deps: org.clojure/tools.cli:1.0.194" level="project" />
     <orderEntry type="library" name="Deps: org.apache.httpcomponents/httpasyncclient:4.1.4" level="project" />
     <orderEntry type="library" name="Deps: org.clojure/tools.analyzer.jvm:1.0.0" level="project" />
-    <orderEntry type="library" name="Deps: github-PractiTest/firecracker-report-parser:9fed1a" level="project" />
     <orderEntry type="library" name="Deps: com.fasterxml.jackson.dataformat/jackson-dataformat-cbor:2.10.2" level="project" />
     <orderEntry type="library" name="Deps: ch.qos.logback/logback-core:1.2.3" level="project" />
     <orderEntry type="library" name="Deps: slingshot:0.12.2" level="project" />

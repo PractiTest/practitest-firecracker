@@ -1,19 +1,18 @@
 (ns practitest-firecracker.core
   (:require
-   [practitest-firecracker.cli        :refer [parse-args]]
-   [practitest-firecracker.practitest :refer [make-client
-                                              create-sf-testset
-                                              make-runs
-                                              populate-sf-results
-                                              create-testsets
-                                              group-tests
-                                              create-or-update-tests
-                                              create-instances
-                                              create-runs]]
-   [firecracker-report-parser.core    :refer [send-directory parse-files]]
-   [clojure.pprint                    :as     pprint]
-   [clojure.java.io                   :refer [file]]
-   [clj-time.core                     :as     t])
+   [practitest-firecracker.cli         :refer [parse-args]]
+   [practitest-firecracker.practitest  :refer [make-client
+                                               make-runs
+                                               populate-sf-results
+                                               create-testsets
+                                               group-tests
+                                               create-or-update-tests
+                                               create-instances
+                                               create-runs]]
+   [practitest-firecracker.parser.core :refer [send-directory parse-files]]
+   [clojure.pprint                     :as     pprint]
+   [clojure.java.io                    :refer [file]]
+   [clj-time.core                      :as     t])
   (:gen-class))
 
 (defn exit [status msg]
