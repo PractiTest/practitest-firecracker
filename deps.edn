@@ -7,10 +7,7 @@
          throttler/throttler                         {:mvn/version "1.0.0"}
          org.clojure/tools.logging                   {:mvn/version "1.1.0"}
          ch.qos.logback/logback-classic              {:mvn/version "1.2.3"}
-         clj-time/clj-time                           {:mvn/version "0.15.2"}
-         github-PractiTest/firecracker-report-parser {:git/url       "git@github.com:PractiTest/firecracker-report-parser.git"
-                                                      :deps/manifest :deps
-                                                      :sha           "9fed1ab43b42f1b6d426925eaf159e620e793c56"}}
+         clj-time/clj-time                           {:mvn/version "0.15.2"}}
  :aliases
  {:dev       {:extra-paths ["dev"]}
   :package   {:extra-paths ["resources" "target/cljs/"]}
