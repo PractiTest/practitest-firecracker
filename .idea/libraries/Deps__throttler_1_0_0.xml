@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="Deps: throttler:1.0.0">
+    <CLASSES>
+      <root url="jar://$MAVEN_REPOSITORY$/throttler/throttler/1.0.0/throttler-1.0.0.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>
