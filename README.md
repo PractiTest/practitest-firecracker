@@ -5,6 +5,13 @@ If the structure of the report changes (new tests are added for example), you wi
 
 If you don't have an existing CONFIG_FILE and you want to use it, go to https://firecracker-ui-prod.practitest.com/ and generate one.
 To login, you can use your PractiTest credentials and follow the instructions in the link. Then you can continue here and set the config-path to your configuration file path.
+
+## Building uberjar
+
+```shell
+clojure -A:depstar -m hf.depstar.uberjar practitest-firecracker-standalone.jar -C -m practitest-firecracker.core
+```
+
 ## Usage
 
 ### help
