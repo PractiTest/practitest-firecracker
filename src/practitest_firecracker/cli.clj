@@ -47,6 +47,10 @@
     "JSON containing the fields that should be added when creating PractiTest TestSet"
     :default {}
     :parse-fn parse-additional-fields]
+   [nil "--additional-run-fields JSON"
+    "JSON containing the fields that should be added when creating PractiTest Runs"
+    :default {}
+    :parse-fn parse-additional-fields]    
    ;; [nil "--test-case-as-pt-test" :default true]
    [nil "--test-case-as-pt-test-step" :default true]
    #_[nil "--pt-test-name DSL"
@@ -92,9 +96,11 @@
   (let [parsed-json                   (json/parse-stream (reader (:config-path options)) true)
         new-additional-test-fields    (parse-additional-fields (json/generate-string (:additional-test-fields parsed-json)))
         new-additional-testset-fields (parse-additional-fields (json/generate-string (:additional-testset-fields parsed-json)))
+        new-additional-run-fields    (parse-additional-fields (json/generate-string (:additional-run-fields parsed-json)))
         new-parsed-json               (merge parsed-json
                                              (when (:additional-testset-fields parsed-json) {:additional-testset-fields new-additional-testset-fields})
                                              (when (:additional-test-fields parsed-json) {:additional-test-fields new-additional-test-fields})
+                                             (when (:additional-run-fields parsed-json) {:additional-run-fields new-additional-run-fields})
                                              (when (:pt-test-name parsed-json) {:pt-test-name (read-query (:pt-test-name parsed-json))})
                                              (when (:pt-test-step-name parsed-json) {:pt-test-step-name (read-query (:pt-test-step-name parsed-json))}))]
     new-parsed-json))
