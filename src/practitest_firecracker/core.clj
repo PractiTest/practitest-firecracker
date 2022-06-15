@@ -8,7 +8,8 @@
                                                group-tests
                                                create-or-update-tests
                                                create-instances
-                                               create-runs]]
+                                               create-runs
+                                               fc-version]]
    [practitest-firecracker.parser.core :refer [send-directory parse-files]]
    [practitest-firecracker.utils       :refer [exit]]
    [clojure.pprint                     :as     pprint]
@@ -44,6 +45,10 @@
             (do
               (pprint/pprint {"=============== options: ===============" options})
               (pprint/pprint {"=============== args: ===============" args}))
+
+            "version"
+            (do
+              (println "Version: " fc-version))
 
             ;; "create-testset"
             ;; (do

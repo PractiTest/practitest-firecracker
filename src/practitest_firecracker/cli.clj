@@ -111,15 +111,13 @@
       {:exit-message (error-msg errors)}
 
       (= "display-config" (first arguments))
-      (cond
-        :else
-        {:action "display-config" :options options})
+      {:action "display-config" :options options}
 
       (= "display-options" (first arguments))
-      (cond
-        :else
-        {:action "display-options" :options options})
+      {:action "display-options" :options options}
 
+      (= "version")
+      {:action "version" :options options}
       ;; (= "create-testset" (first arguments))
       ;; (cond
       ;;   (nil? (:project-id options))
