@@ -3,7 +3,6 @@
    [practitest-firecracker.cli         :refer [parse-args]]
    [practitest-firecracker.practitest  :refer [make-client
                                                make-runs
-                                               populate-sf-results
                                                create-testsets
                                                group-tests
                                                create-or-update-tests
@@ -47,29 +46,7 @@
               (pprint/pprint {"=============== args: ===============" args}))
 
             "version"
-            (do
-              (println "Version: " fc-version))
-
-            ;; "create-testset"
-            ;; (do
-            ;;   (doall
-            ;;    (pmap
-            ;;     (fn [report]
-            ;;       (let [testset (create-or-update-sf-testset client options report)]
-            ;;         (pprint/pprint (format "Populated TestSet ID: %s" (:id testset)))))
-            ;;     additional-reports))
-            ;;   (exit 0 "Done"))
-
-            "populate-testset"
-            (do
-              (doall
-               (pmap
-                (fn [report]
-                  (populate-sf-results client
-                                       options
-                                       report))
-                additional-reports))
-              (exit 0 "Done"))
+            (println "Version: " fc-version)
 
             "create-and-populate-testset"
             (do

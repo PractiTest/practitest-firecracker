@@ -74,11 +74,8 @@
         options-summary
         ""
         "Actions:"
-        "  create-testset              Analyzes the given Surefire reports directory and creates a TestSet with Tests and Steps in PractiTest to reflect"
-        "                              the structure of the report. Returns a TestSet ID that you should use to run the 'populate-testset' action"
-        "  populate-testset            Analyzes the given Surefire reports directory and populates the given TestSet with the data from the report"
-        "  create-and-populate-testset Shortcut to perform both actions. If the TestSet with the given name already exists, it will be reused. If it exists, but has completely different set of tests, an error will be reported."
-        ""]
+        "  create-and-populate-testset  Shortcut to perform both actions. If the TestSet with the given name already exists, it will be reused. If it exists, but has completely different set of tests, an error will be reported."
+        "  version                      Will display firecracker jar file version"]
        (string/join \newline)))
 
 (defn error-msg [errors]
@@ -116,7 +113,7 @@
       (= "display-options" (first arguments))
       {:action "display-options" :options options}
 
-      (= "version")
+      (= "version" (first arguments))
       {:action "version" :options options}
       ;; (= "create-testset" (first arguments))
       ;; (cond

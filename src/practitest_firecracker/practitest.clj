@@ -489,21 +489,6 @@
                    :attributes run
                    :steps run-steps}))))))
 
-(defn populate-sf-results [client {:keys [project-id testset-id display-action-logs] :as options} sf-test-suites]
-  (when display-action-logs (log/infof "populating testset %s with results from %d suites" testset-id (count sf-test-suites)))
-  (when (or (:skip-validation? options)
-            (validate-testset client project-id testset-id sf-test-suites))
-    (doall
-     (pmap (fn [test-suite]
-             (let [test-name       (sf-test-suite->pt-test-name options test-suite)
-                   log             (if display-action-logs (log/infof "instance test-name: %s " test-name) nil)
-                   test            (ll-find-test client [project-id display-action-logs] test-name)
-                   instance        (ll-find-instance client [project-id display-action-logs] testset-id (:id test))
-                   [run run-steps] (sf-test-suite->run-def options test-suite)]
-               (ll-create-run client [project-id display-action-logs] (:id instance) run run-steps)))
-           sf-test-suites))
-    true))
-
 (defn find-sf-testset [client [project-id display-action-logs] options testset-name]
   (let [testset (ll-find-testset client [project-id display-action-logs] testset-name)]
     (when testset
