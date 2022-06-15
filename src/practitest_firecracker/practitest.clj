@@ -33,8 +33,7 @@
   (apply format (str base-uri resource-uri-template) params))
 
 (defn throw-api-exception [ex-info status body uri]
-  (exit status (group-errors body))
-  (System/exit status))
+  (exit status (group-errors body)))
 
 (defn api-call [{:keys [credentials uri method query-params form-params]}]
   (assert (not (and query-params form-params))
