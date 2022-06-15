@@ -10,14 +10,11 @@
                                                create-instances
                                                create-runs]]
    [practitest-firecracker.parser.core :refer [send-directory parse-files]]
+   [practitest-firecracker.utils       :refer [exit]]
    [clojure.pprint                     :as     pprint]
    [clojure.java.io                    :refer [file]]
    [clj-time.core                      :as     t])
   (:gen-class))
-
-(defn exit [status msg]
-  (println msg)
-  (System/exit status))
 
 (defmacro timef
   [module expr]

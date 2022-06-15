@@ -21,3 +21,7 @@
                             ;; :test test})
         ]
     true))
+
+(defn exit [status msg]
+  (println msg)
+  (System/exit status))

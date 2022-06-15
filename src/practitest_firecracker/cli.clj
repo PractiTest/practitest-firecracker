@@ -150,9 +150,6 @@
         (nil? (:project-id options))
         {:exit-message (missing-option-msg "create-and-populate-testset" "project-id")}
 
-        (nil? (:author-id options))
-        {:exit-message (missing-option-msg "create-and-populate-testset" "author-id")}
-
         (and (nil? (:testset-name options)) (not (:multitestset options)))
         {:exit-message (missing-option-msg "create-and-populate-testset" "testset-name")}
 
