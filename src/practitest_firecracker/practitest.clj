@@ -8,7 +8,7 @@
    [cheshire.core                    :as json]
    [practitest-firecracker.query-dsl :refer [query? eval-query]]
    [throttler.core                   :refer [fn-throttler]]
-   [practitest-firecracker.utils     :refer [parse-id print-run-time test-need-update? exit]]
+   [practitest-firecracker.utils     :refer [parse-id print-run-time test-need-update? exit group-errors]]
    [clojure.pprint                   :as     pprint]))
 
 ;; ===========================================================================
@@ -33,7 +33,7 @@
   (apply format (str base-uri resource-uri-template) params))
 
 (defn throw-api-exception [ex-info status body uri]
-  (exit status (str "Errors: \n" (string/join "\n" (map #(str "- " %) (map :title (:errors (json/parse-string body true)))))))
+  (exit status (group-errors body))
   (System/exit status))
 
 (defn api-call [{:keys [credentials uri method query-params form-params]}]

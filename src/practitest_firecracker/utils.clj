@@ -25,3 +25,6 @@
 (defn exit [status msg]
   (println msg)
   (System/exit status))
+
+(defn group-errors [body]
+  (str "Errors: \n" (string/join "\n" (map #(str "- " %) (map :title (:errors (json/parse-string body true)))))))
