@@ -66,7 +66,7 @@
    ["-h" "--help"]])
 
 (defn usage [options-summary]
-  (->> ["PractiTest Surefire reports analyzer."
+  (->> ["PractiTest reports analyzer."
         ""
         "Usage: java -jar practitest-firecracker-standaline.jar [options] action"
         ""
@@ -115,30 +115,6 @@
 
       (= "version" (first arguments))
       {:action "version" :options options}
-      ;; (= "create-testset" (first arguments))
-      ;; (cond
-      ;;   (nil? (:project-id options))
-      ;;   {:exit-message (missing-option-msg "create-testset" "project-id")}
-
-      ;;   (nil? (:author-id options))
-      ;;   {:exit-message (missing-option-msg "create-testset" "author-id")}
-
-      ;;   (nil? (:testset-name options))
-      ;;   {:exit-message (missing-option-msg "create-testset" "testset-name")}
-
-      ;;   :else
-      ;;   {:action "create-testset" :options options})
-
-      (= "populate-testset" (first arguments))
-      (cond
-        (nil? (:project-id options))
-        {:exit-message (missing-option-msg "populate-testset" "project-id")}
-
-        (nil? (:testset-id options))
-        {:exit-message (missing-option-msg "populate-testset" "testset-id")}
-
-        :else
-        {:action "populate-testset" :options options})
 
       (= "create-and-populate-testset" (first arguments))
       (cond

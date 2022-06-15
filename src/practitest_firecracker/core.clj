@@ -30,8 +30,8 @@
       (exit (if ok? 0 1) exit-message)
       (let [client             (make-client (select-keys options [:email :api-token :api-uri :max-api-rate]))
             directory          (:reports-path options)
-            dirs               (for [dir directory] (clojure.java.io/file dir))
-            parsed-dirs        (for [dir (file-seq (first dirs))] (parse-files dir))
+            dirs               (when-not (nil? directory) (for [dir directory] (clojure.java.io/file dir)))
+            parsed-dirs        (when-not (nil? dirs) (for [dir (file-seq (first dirs))] (parse-files dir)))
             additional-reports (send-directory parsed-dirs (:test-case-as-pt-test-step options) (:multitestset options) (:testset-name options) false)
             start-time         (t/now)]
           (case action
