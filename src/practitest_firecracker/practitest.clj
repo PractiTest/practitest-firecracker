@@ -5,14 +5,15 @@
    [clojure.walk                     :refer [postwalk]]
    [clj-http.client                  :as http]
    [clojure.tools.logging            :as log]
+   [cheshire.core                    :as json]
    [practitest-firecracker.query-dsl :refer [query? eval-query]]
    [throttler.core                   :refer [fn-throttler]]
-   [practitest-firecracker.utils     :refer [parse-id print-run-time test-need-update?]]
+   [practitest-firecracker.utils     :refer [parse-id print-run-time test-need-update? exit group-errors]]
    [clojure.pprint                   :as     pprint]))
 
 ;; ===========================================================================
 ;; api version
-(def ^:const fc-version "2.0.2")
+(def ^:const fc-version "2.0.4")
 
 ;; ===========================================================================
 ;; utils
@@ -32,9 +33,7 @@
   (apply format (str base-uri resource-uri-template) params))
 
 (defn throw-api-exception [ex-info status body uri]
-  (throw (ex-info "API request failed" {:status status
-                                        :body   body
-                                        :uri    uri})))
+  (exit status (group-errors body)))
 
 (defn api-call [{:keys [credentials uri method query-params form-params]}]
   (assert (not (and query-params form-params))
@@ -489,21 +488,6 @@
                   {:instance-id (:id instance)
                    :attributes run
                    :steps run-steps}))))))
-
-(defn populate-sf-results [client {:keys [project-id testset-id display-action-logs] :as options} sf-test-suites]
-  (when display-action-logs (log/infof "populating testset %s with results from %d suites" testset-id (count sf-test-suites)))
-  (when (or (:skip-validation? options)
-            (validate-testset client project-id testset-id sf-test-suites))
-    (doall
-     (pmap (fn [test-suite]
-             (let [test-name       (sf-test-suite->pt-test-name options test-suite)
-                   log             (if display-action-logs (log/infof "instance test-name: %s " test-name) nil)
-                   test            (ll-find-test client [project-id display-action-logs] test-name)
-                   instance        (ll-find-instance client [project-id display-action-logs] testset-id (:id test))
-                   [run run-steps] (sf-test-suite->run-def options test-suite)]
-               (ll-create-run client [project-id display-action-logs] (:id instance) run run-steps)))
-           sf-test-suites))
-    true))
 
 (defn find-sf-testset [client [project-id display-action-logs] options testset-name]
   (let [testset (ll-find-testset client [project-id display-action-logs] testset-name)]

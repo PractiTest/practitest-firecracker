@@ -55,6 +55,12 @@
                                (throw
                                 (ex-info "Syntax error: 'drop-last' must have one or two arguments"
                                          {:query query})))
+        'take-last           (case (count args)
+                               1 (take-last 1 (first args))
+                               2 (take-last (first args) (second args))
+                               (throw
+                                 (ex-info "Syntax error: 'take-last' must have one or two arguments"
+                                          {:query query})))
         'concat              (apply str args)
         'capitalize          (if (= 1 (count args))
                                (map string/capitalize (first args))
