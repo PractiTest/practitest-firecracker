@@ -1,7 +1,9 @@
 (ns practitest-firecracker.utils
   (:require
    [clj-time.core                      :as t]
-   [clojure.pprint                     :as pprint]))
+   [clojure.pprint                     :as pprint]
+   [clojure.string                     :as string]
+   [cheshire.core                      :as json]))
 
 (defn print-run-time [text start-time]
   (let [sec-pass   (t/in-seconds (t/interval start-time (t/now)))
@@ -21,3 +23,10 @@
                             ;; :test test})
         ]
     true))
+
+(defn exit [status msg]
+  (println msg)
+  (System/exit status))
+
+(defn group-errors [body]
+  (str "Errors: \n" (string/join "\n" (map #(str "- " %) (map :title (:errors (json/parse-string body true)))))))

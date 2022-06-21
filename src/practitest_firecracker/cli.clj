@@ -70,7 +70,7 @@
    ["-h" "--help"]])
 
 (defn usage [options-summary]
-  (->> ["PractiTest Surefire reports analyzer."
+  (->> ["PractiTest reports analyzer."
         ""
         "Usage: java -jar practitest-firecracker-standaline.jar [options] action"
         ""
@@ -78,11 +78,8 @@
         options-summary
         ""
         "Actions:"
-        "  create-testset              Analyzes the given Surefire reports directory and creates a TestSet with Tests and Steps in PractiTest to reflect"
-        "                              the structure of the report. Returns a TestSet ID that you should use to run the 'populate-testset' action"
-        "  populate-testset            Analyzes the given Surefire reports directory and populates the given TestSet with the data from the report"
-        "  create-and-populate-testset Shortcut to perform both actions. If the TestSet with the given name already exists, it will be reused. If it exists, but has completely different set of tests, an error will be reported."
-        ""]
+        "  create-and-populate-testset  Shortcut to perform both actions. If the TestSet with the given name already exists, it will be reused. If it exists, but has completely different set of tests, an error will be reported."
+        "  version                      Will display firecracker jar file version"]
        (string/join \newline)))
 
 (defn error-msg [errors]
@@ -117,47 +114,18 @@
       {:exit-message (error-msg errors)}
 
       (= "display-config" (first arguments))
-      (cond
-        :else
-        {:action "display-config" :options options})
+      {:action "display-config" :options options}
 
       (= "display-options" (first arguments))
-      (cond
-        :else
-        {:action "display-options" :options options})
+      {:action "display-options" :options options}
 
-      ;; (= "create-testset" (first arguments))
-      ;; (cond
-      ;;   (nil? (:project-id options))
-      ;;   {:exit-message (missing-option-msg "create-testset" "project-id")}
-
-      ;;   (nil? (:author-id options))
-      ;;   {:exit-message (missing-option-msg "create-testset" "author-id")}
-
-      ;;   (nil? (:testset-name options))
-      ;;   {:exit-message (missing-option-msg "create-testset" "testset-name")}
-
-      ;;   :else
-      ;;   {:action "create-testset" :options options})
-
-      (= "populate-testset" (first arguments))
-      (cond
-        (nil? (:project-id options))
-        {:exit-message (missing-option-msg "populate-testset" "project-id")}
-
-        (nil? (:testset-id options))
-        {:exit-message (missing-option-msg "populate-testset" "testset-id")}
-
-        :else
-        {:action "populate-testset" :options options})
+      (= "version" (first arguments))
+      {:action "version" :options options}
 
       (= "create-and-populate-testset" (first arguments))
       (cond
         (nil? (:project-id options))
         {:exit-message (missing-option-msg "create-and-populate-testset" "project-id")}
-
-        (nil? (:author-id options))
-        {:exit-message (missing-option-msg "create-and-populate-testset" "author-id")}
 
         (and (nil? (:testset-name options)) (not (:multitestset options)))
         {:exit-message (missing-option-msg "create-and-populate-testset" "testset-name")}

@@ -1,7 +1,7 @@
 # practitest-firecracker
 
-You will need to use the 'create-testset' action once and the 'populate-testset' action every time there is a new report.
-If the structure of the report changes (new tests are added for example), you will need to use the 'create-testset' action again. New TestSets will be created, but existing tests will be reused.
+You will need to use the 'create-and-populate-testset' action that will create and populate TestSets, Tests, Instances and Runs.
+If the structure of the report changes (new tests are added for example), you will need to use the 'create-and-populate-testset' action again. New TestSets will be created, but existing tests will be reused.
 
 If you don't have an existing CONFIG_FILE and you want to use it, go to https://firecracker-ui-prod.practitest.com/ and generate one.
 To login, you can use your PractiTest credentials and follow the instructions in the link. Then you can continue here and set the config-path to your configuration file path.
@@ -23,35 +23,12 @@ java -jar practitest-firecracker-standalone.jar help
 ```
 to get more information about the parameters and commands.
 
-### create-testset
+### version
 
-Create new testset from reports folder:
-
-``` shell
-java -jar practitest-firecracker-standalone.jar \
-    --reports-path=SUREFIRE_REPORTS_PATH \
-    --testset-name="TestSet name" \
-    --author-id=PRACTITEST_USER_ID \
-    --config-path=CONFIG_FILE \
-    create-testset
-```
-
-The call above will analyze the surefire reports and create tests and the testset. If a test already exists, it will be reused.
-
-You can set various custom fields for tests when they are created (especially useful if you have mandatory fields configured in your tests).
-
-To set custom fields you will need to create a configuration file in here: https://firecracker-ui-prod.practitest.com/ .After that you can use it to run the command line above with it (CONFIG_FILE).
-
-### populate-testset
-Populate the testset from reports folder:
+To check your jar version you can you this command:
 
 ``` shell
-java -jar practitest-firecracker-standalone.jar \
-    --reports-path=SUREFIRE_REPORTS_PATH \
-    --testset-id=PRACTITEST_TESTSET_ID \
-    --author-id=PRACTITEST_USER_ID \
-    --config-path=CONFIG_FILE \
-    populate-testset
+java -jar practitest-firecracker-standalone.jar version
 ```
 
 ### create-and-populate-testset
@@ -62,19 +39,26 @@ Example:
 
 ``` shell
 java -jar practitest-firecracker-standalone.jar \
-    --reports-path=SUREFIRE_REPORTS_PATH \
-    --testset-name="TestSet name" \
+    --reports-path=REPORTS_FOLDER_PATH \
     --author-id=PRACTITEST_USER_ID \
     --config-path=CONFIG_FILE \
     create-and-populate-testset
 ```
-* In the future config files --testset-name will be defined inside of the config file so there will be no need to define it in the command line
+* author-id is not required in case of PAT (personal api token) is in use
+
+The call above will analyze the surefire reports and create and populate tests and the testset. If a test already exists, it will be reused.
+
+You can set various custom fields for tests when they are created (especially useful if you have mandatory fields configured in your tests).
+
+To set custom fields you will need to create a configuration file in here: https://firecracker-ui-prod.practitest.com/ .After that you can use it to run the command line above with it (CONFIG_FILE).
+
 ### use Firecracker without config file
 
 You can use all the above commands without the config file. You will need to explicitly define
 parameters:
 --api-token=YOUR_API_TOKEN
 --email=YOUR_EMAIL
+--testset-name=TESTSET_NAME
 --project-id=PRACTITEST_PROJECT_ID
 --additional-test-fields '{"custom-fields": {"---f-123": "foo", "---f-124": "bar"}, "system-fields"{"version": "2.3", "status":"Draft"}}'
 --additional-testset-fields '{"custom-fields": {"---f-125": "baz"}, "system-fields"{"version": "1.0", "assigned-to-id": "1"}}
@@ -83,12 +67,12 @@ if they are relevant to the run (additional-fields not required).
 
 
 Example:
-
 ``` shell
 java -jar practitest-firecracker-standalone.jar \
     --api-token=YOUR_API_TOKEN \
     --email=YOUR_EMAIL \
-    --reports-path=SUREFIRE_REPORTS_PATH \
+    --testset-name=TESTSET_NAME \
+    --reports-path=REPORTS_FOLDER_PATH \
     --project-id=PRACTITEST_PROJECT_ID \
     --testset-name="TestSet name" \
     --author-id=PRACTITEST_USER_ID \
@@ -119,6 +103,11 @@ In case you have very big xml test results and it take very long time for firecr
 In case you want the name of the test to take its value from other attribute of testcase(s) add this parameter --pt-test-name=?ATTRIBUTE for example --pt-test-name=?full-class-name you can see the values that acceptable in firecracker UI (default is ?pt-test-name)
 
 Same goes for --pt-test-step-name that will define the name of the steps.
+
+--multitestset option will point if we are using multitestset file if it is true we will take the testsetname from
+the name attribute from inside the file.
+
+--test-case-as-pt-test-step will declare if we want to set testcase as single test or as a group of testcases.
 
 For more information contact our support.
 
