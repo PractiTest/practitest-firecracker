@@ -60,8 +60,9 @@ parameters:
 --email=YOUR_EMAIL
 --testset-name=TESTSET_NAME
 --project-id=PRACTITEST_PROJECT_ID
---additional-test-fields='{"custom-fields": {"---f-123": "foo", "---f-124": "bar"}, "system-fields"{"version": "2.3", "status":"Draft"}}'
---additional-testset-fields='{"custom-fields": {"---f-125": "baz"}, "system-fields"{"version": "1.0", "assigned-to-id": "1"}}
+--additional-test-fields '{"custom-fields": {"---f-123": "foo", "---f-124": "bar"}, "system-fields"{"version": "2.3", "status":"Draft"}}'
+--additional-testset-fields '{"custom-fields": {"---f-125": "baz"}, "system-fields"{"version": "1.0", "assigned-to-id": "1"}}
+--additional-run-fields '{"custom-fields": {"---f-124": "test"}, "system-fields"{}}
 if they are relevant to the run (additional-fields not required).
 
 
@@ -77,6 +78,7 @@ java -jar practitest-firecracker-standalone.jar \
     --author-id=PRACTITEST_USER_ID \
     --additional-test-fields '{"custom-fields": {"---f-123": "foo", "---f-124": "bar"}}' \
     --additional-testset-fields '{"custom-fields": {"---f-125": "baz"}}' \
+    --additional-run-fields '{"custom-fields": {"---f-124": "test"}, "system-fields"{}}' \
     create-and-populate-testset
 ```
 

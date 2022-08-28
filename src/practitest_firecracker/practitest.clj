@@ -477,6 +477,10 @@
   [{:run-duration (:time-elapsed test-suite)}
    (map (partial sf-test-case->run-step-def options) (:test-cases test-suite))])
 
+(defn sf-test-run->run-def [custom-fields run-duration]
+  {:run-duration (:time-elapsed run-duration),
+   :custom-fields (:custom-fields custom-fields)})
+
 (defn make-runs [[test-by-id instance-to-ts-test] client {:keys [project-id display-action-logs] :as options} start-time]
   (when display-action-logs (log/infof "make-runs"))
   (flatten (doall
@@ -484,10 +488,13 @@
               (for [instance instances]
                 (let [[ts-id test-id] test-testset
                       tst (first (get test-by-id test-id))
-                      [run run-steps] (sf-test-suite->run-def options (get tst 1))]
-                  {:instance-id (:id instance)
+                      [run run-steps] (sf-test-suite->run-def options (get tst 1))
+                      additional-run-fields (eval-additional-fields run (:additional-run-fields options))
+                      additional-run-fields (merge additional-run-fields (:system-fields additional-run-fields))
+                      run (sf-test-run->run-def additional-run-fields (get tst 1))]
+                  {:instance-id (:id instance)                   
                    :attributes run
-                   :steps run-steps}))))))
+                   :steps run-steps})))))) 
 
 (defn find-sf-testset [client [project-id display-action-logs] options testset-name]
   (let [testset (ll-find-testset client [project-id display-action-logs] testset-name)]
