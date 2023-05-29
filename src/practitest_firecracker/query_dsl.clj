@@ -3,7 +3,8 @@
    [clojure.string :as string]
    [clojure.edn    :as edn]
    [clojure.pprint                    :as     pprint]
-   [clojure.tools.logging            :as log]))
+   [clojure.tools.logging            :as log])
+  (:import (java.util.regex Pattern)))
 
 
 (defn fix-abbreviations [tokens]
@@ -72,6 +73,23 @@
                                (throw
                                 (ex-info "Syntax error: 'join' must have one argument"
                                          {:query query})))
+        'split               (if (= 2 (count args))
+                               (let [quoted    (Pattern/quote    (first args))
+                                     complied  (Pattern/compile  quoted)]
+                                 (string/split (second args) complied))
+                               (throw
+                                 (ex-info "Syntax error: 'split' must have two arguments"
+                                          {:query query})))
+        'get               (if (= 2 (count args))
+                               (take (drop (parse-int (first args)) (last args)))
+                               (throw
+                                 (ex-info "Syntax error: 'get' must have two arguments"
+                                          {:query query})))
+        'trim               (if (= 1 (count args))
+                             (string/trim (first args))
+                             (throw
+                               (ex-info "Syntax error: 'trim' must have only one argument"
+                                        {:query query})))
         (throw
          (ex-info (format "Syntax error: unsupported function '%s'" op)
                   {:query query}))))
