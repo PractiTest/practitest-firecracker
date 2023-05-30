@@ -2,7 +2,8 @@
   (:require
    [clojure.string :as string]
    [clojure.edn    :as edn])
-  (:import [java.util.regex Pattern]))
+  (:import #?(:clj [java.util.regex Pattern]
+              :cljs [goog.string :as gstring])))
 
 
 (defn fix-abbreviations [tokens]
@@ -72,8 +73,10 @@
                                 (ex-info "Syntax error: 'join' must have one argument"
                                          {:query query})))
         'split               (if (= 2 (count args))
-                               (let [quoted    (Pattern/quote    (first args))
-                                     complied  (Pattern/compile  quoted)]
+                               (let [quoted    #?(:clj  (Pattern/quote    (first args))
+                                                  :cljs (first args))
+                                     complied  #?(:clj  (java.util.regex.Pattern/compile "your-regex-pattern")
+                                                  :cljs (gstring/regexp "your-regex-pattern"))(Pattern/compile  quoted)]
                                  (string/split (second args) complied))
                                (throw
                                  (ex-info "Syntax error: 'split' must have two arguments"
