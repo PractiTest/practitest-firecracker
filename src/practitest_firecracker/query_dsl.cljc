@@ -2,7 +2,7 @@
   (:require
    [clojure.string :as string]
    [clojure.edn    :as edn])
-  (import 'java.util.regex.Pattern))
+  (:import 'java.util.regex.Pattern))
 
 
 (defn fix-abbreviations [tokens]
