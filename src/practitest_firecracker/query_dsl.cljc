@@ -73,10 +73,10 @@
                                 (ex-info "Syntax error: 'join' must have one argument"
                                          {:query query})))
         'split               (if (= 2 (count args))
-                               (let [quoted    #?(:clj  (Pattern/quote    (first args))
+                               (let [quoted    #?(:clj  (Pattern/quote (first args))
                                                   :cljs (first args))
-                                     complied  #?(:clj  (java.util.regex.Pattern/compile "your-regex-pattern")
-                                                  :cljs (gstring/regexp "your-regex-pattern"))(Pattern/compile  quoted)]
+                                     complied  #?(:clj  (Pattern/compile quoted)
+                                                  :cljs (gstring/regexp quoted))]
                                  (string/split (second args) complied))
                                (throw
                                  (ex-info "Syntax error: 'split' must have two arguments"
