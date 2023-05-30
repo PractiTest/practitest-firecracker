@@ -1,9 +1,7 @@
 (ns practitest-firecracker.query-dsl
   (:require
    [clojure.string :as string]
-   [clojure.edn    :as edn]
-   [clojure.pprint                    :as     pprint]
-   [clojure.tools.logging            :as log])
+   [clojure.edn    :as edn])
   (:import (java.util.regex Pattern)))
 
 
