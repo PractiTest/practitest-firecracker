@@ -1,9 +1,9 @@
 (ns practitest-firecracker.query-dsl
   (:require
    [clojure.string :as string]
-   [clojure.edn    :as edn])
-  (:import #?(:clj [java.util.regex Pattern]
-              :cljs [goog.string :as gstring])))
+   [clojure.edn    :as edn]
+   #?(:clj [java.util.regex Pattern]
+      :cljs [goog.string :as gstring])))
 
 
 (defn fix-abbreviations [tokens]
