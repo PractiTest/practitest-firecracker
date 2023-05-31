@@ -98,25 +98,24 @@
          (ex-info
            #?(:clj (format "Syntax error: unsupported function '%s'" op)
               :cljs (str "Syntax error: unsupported function: " op))
-                  {:query query})))
-
+                  {:query query}))))
     #?(:cljs (cond
-              (= '?field query)                     val
-              (string/starts-with? (str query) "?") (throw
-                                                      (ex-info (str "Syntax error: unsupported variable " query)
-                                                               {:query query}))
-              (number? query)                       query
-              :else                                 (str query))
+               (= '?field query)                     val
+               (string/starts-with? (str query) "?") (throw
+                                                       (ex-info (str "Syntax error: unsupported variable " query)
+                                                                {:query query}))
+               (number? query)                       query
+               :else                                 (str query))
        :clj (let [key (keyword (string/join (drop 1 (str query))))]
-                  (cond
-                    (= :test-suite-name key)              (:name test-suite)
-                    (= :test-case-name key)               (:name test-case)
-                    (and (not (= test-suite nil))
-                         (contains? test-suite key))      (key test-suite)
-                    (and (not (= test-case nil))
-                         (contains? test-case key))       (key test-case)
-                    (string/starts-with? (str query) "?") (str "")
-                    :else                                 (str query)))))))
+              (cond
+                (= :test-suite-name key)              (:name test-suite)
+                (= :test-case-name key)               (:name test-case)
+                (and (not (= test-suite nil))
+                     (contains? test-suite key))      (key test-suite)
+                (and (not (= test-case nil))
+                     (contains? test-case key))       (key test-case)
+                (string/starts-with? (str query) "?") (str "")
+                :else                                 (str query))))))
 
 (defn read-query [s]
   (let [query    (edn/read-string s)
