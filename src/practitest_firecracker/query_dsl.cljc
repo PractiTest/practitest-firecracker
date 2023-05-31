@@ -98,7 +98,7 @@
          (ex-info
            #?(:clj (format "Syntax error: unsupported function '%s'" op)
               :cljs (str "Syntax error: unsupported function: " op))
-                  {:query query}))))
+                  {:query query})))
 
     #?(:cljs (cond
               (= '?field query)                     val
@@ -116,7 +116,7 @@
                     (and (not (= test-case nil))
                          (contains? test-case key))       (key test-case)
                     (string/starts-with? (str query) "?") (str "")
-                    :else                                 (str query))))))
+                    :else                                 (str query)))))))
 
 (defn read-query [s]
   (let [query    (edn/read-string s)
@@ -126,13 +126,13 @@
                        {:op   (compile-query op)
                         :args (vec (map compile-query args))})
                      query))]
-    #?(:clj  (if (not (or (= java.lang.Long (type query))
-                          (= java.lang.Double (type query))
-                          (and (= java.lang.String (type query)))))
+    #?(:cljs (if (and (not (number? query)) (not (string? query)))
                (with-meta (compiler query)
                           {:query true})
                (compiler query))
-       :cljs (if (and (not (number? query)) (not (string? query)))
+       :clj  (if (not (or (= java.lang.Long (type query))
+                          (= java.lang.Double (type query))
+                          (and (= java.lang.String (type query)))))
                (with-meta (compiler query)
                           {:query true})
                (compiler query)))))
