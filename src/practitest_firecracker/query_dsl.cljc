@@ -25,10 +25,10 @@
   #?(:clj (Integer. (re-find  #"\d+" s ))
      :cljs (js/parseInt (re-find  #"\d+" s ))))
 
-(defn eval-query [val query]
+(defn eval-query-clj [val query]
   (if (map? query)
     (let [{:keys [op args]} query
-          args              (map (partial eval-query val) args)]
+          args              (map (partial eval-query-clj val) args)]
       (condp = op
         'tokenize-package    (if (= 1 (count args))
                                (string/split (first args) #"\.")
