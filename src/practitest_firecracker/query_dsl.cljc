@@ -116,7 +116,7 @@
                     (and (not (= test-case nil))
                          (contains? test-case key))       (key test-case)
                     (string/starts-with? (str query) "?") (str "")
-                    :else                                 (str query)))))
+                    :else                                 (str query))))))
 
 (defn read-query [s]
   (let [query    (edn/read-string s)
