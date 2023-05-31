@@ -23,7 +23,7 @@
 
 (defn parse-int [s]
   #?(:clj (Integer. (re-find  #"\d+" s ))
-     :cljs (js/parseInt s)))
+     :cljs (js/parseInt s 10)))
 
 (defn eval-query-clj [val query]
   (if (map? query)
