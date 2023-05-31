@@ -87,10 +87,10 @@
                                  (ex-info "Syntax error: 'join' must have one argument"
                                           {:query query})))
         'split               (if (= 2 (count args))
-                               (let [quoted    #?(:clj  (js/RegExp. (first args))
+                               (let [quoted    #?(:clj  (first args)
                                                   :cljs (first args))
                                      complied  #?(:clj  (Pattern/compile quoted)
-                                                  :cljs (js/re-pattern quoted))]
+                                                  :cljs (js/RegExp. quoted))]
                                  (string/split (second args) complied))
                                (throw
                                  (ex-info "Syntax error: 'split' must have two arguments"
@@ -172,7 +172,7 @@
                                (let [quoted    #?(:clj  (Pattern/quote (first args))
                                                   :cljs (first args))
                                      complied  #?(:clj  (Pattern/compile quoted)
-                                                  :cljs (gstring/re-pattern quoted))]
+                                                  :cljs (js/RegExp. quoted))]
                                  (string/split (second args) complied))
                                (throw
                                  (ex-info "Syntax error: 'split' must have two arguments"
