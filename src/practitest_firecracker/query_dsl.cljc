@@ -100,14 +100,14 @@
               :cljs (str "Syntax error: unsupported function: " op))
                   {:query query}))))
 
-    #?(:clj (cond
+    #?(:cljs (cond
               (= '?field query)                     val
               (string/starts-with? (str query) "?") (throw
                                                       (ex-info (str "Syntax error: unsupported variable " query)
                                                                {:query query}))
               (number? query)                       query
               :else                                 (str query))
-       :cljs (let [key (keyword (string/join (drop 1 (str query))))]
+       :clj (let [key (keyword (string/join (drop 1 (str query))))]
                   (cond
                     (= :test-suite-name key)              (:name test-suite)
                     (= :test-case-name key)               (:name test-case)
