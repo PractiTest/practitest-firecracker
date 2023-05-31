@@ -22,7 +22,8 @@
           (recur (conj results head) tail))))))
 
 (defn parse-int [s]
-  (Integer. (re-find  #"\d+" s )))
+  #?(:clj (Integer. (re-find  #"\d+" s ))
+     :cljs (js/parseInt %)))
 
 (defn eval-query [test-suite test-case query]
   (if (map? query)
@@ -94,7 +95,9 @@
                                (ex-info "Syntax error: 'trim' must have only one argument"
                                         {:query query})))
         (throw
-         (ex-info (format "Syntax error: unsupported function '%s'" op)
+         (ex-info
+           #?(:clj (format "Syntax error: unsupported function '%s'" op)
+              :cljs (gstring/format "Syntax error: unsupported function '%s'" op))
                   {:query query}))))
 
     (let [key (keyword (string/join (drop 1 (str query))))]
