@@ -13,13 +13,13 @@
       (let [[head & tail] input]
         (if (and (= 1 (count head))
                  (not-empty (last results))
-                 (every? #?(:clj #(Character/isUpperCase %)
-                            :cljs #(js/toUpperCase  %))
-                         (last results)))
+                 (every? #?(:clj    #(Character/isUpperCase %)
+                            :cljs   #(.toUpperCase %))
+                             (last results))))
           (recur (conj (vec (drop-last results))
                        (str (last results) head))
                  tail)
-          (recur (conj results head) tail))))))
+          (recur (conj results head) tail)))))
 
 (defn parse-int [s]
   #?(:clj (Integer. (re-find  #"\d+" s ))
@@ -211,6 +211,25 @@
                 :else                                 (str query))))))
 
 (defn read-query [s]
+  (let [query    (edn/read-string s)
+        compiler (fn compile-query [query]
+                   (if (list? query)
+                     (let [[op & args] query]
+                       {:op   (compile-query op)
+                        :args (vec (map compile-query args))})
+                     query))]
+    #?(:cljs (if (and (not (number? query)) (not (string? query)))
+               (with-meta (compiler query)
+                          {:query true})
+               (compiler query))
+       :clj  (if (not (or (= java.lang.Long (type query))
+                          (= java.lang.Double (type query))
+                          (and (= java.lang.String (type query)))))
+               (with-meta (compiler query)
+                          {:query true})
+               (compiler query)))))
+
+(defn read-query-clj [s]
   (try
     (let [query    (edn/read-string s)
           compiler (fn compile-query [query]
@@ -220,18 +239,18 @@
                           :args (vec (map compile-query args))})
                        query))]
       #?(:cljs (if (and (not (number? query)) (not (string? query)))
-                 (with-meta (compiler query)
-                            {:query true})
-                 (compiler query))
-         :clj  (if (not (or (= java.lang.Long (type query))
-                            (= java.lang.Double (type query))
-                            (and (= java.lang.String (type query)))))
-                 (with-meta (compiler query)
-                            {:query true})
-                 (compiler query))))
-    #?(:cljs (catch js/Error e (str "caught exception: " e)))
-    #?(:cljs (catch js/Object e
-               (str "Error: " e)))))
+                  (with-meta (compiler query)
+                             {:query true})
+                  (compiler query))
+          :clj  (if (not (or (= java.lang.Long (type query))
+                             (= java.lang.Double (type query))
+                             (and (= java.lang.String (type query)))))
+                  (with-meta (compiler query)
+                             {:query true})
+                  (compiler query))))
+    (catch js/Error e (str "caught exception: " e))
+    (catch js/Object e
+      (str "Error: " e))))
 
 (defn query? [obj]
   (boolean (:query (meta obj))))
