@@ -42,7 +42,7 @@
                                (str "Syntax error: 'tokenize-class-name' must have one argument " query))
         'take                (if (= 2 (count args))
                                (if (or (string? (last args)) (coll? (last args)))
-                                 (take (js/parseInt (first args)) (last args))
+                                 (take (parse-int (first args)) (last args))
                                  (throw
                                    (ex-info "Syntax error: 'take' second argument has to be ISeqable (String, Array etc.)"
                                             {:query query})))
@@ -51,7 +51,7 @@
                                           {:query query})))
         'drop                (if (= 2 (count args))
                                (if (or (string? (last args)) (coll? (last args)))
-                                 (drop (js/parseInt (first args)) (last args))
+                                 (drop (parse-int (first args)) (last args))
                                  (throw
                                    (ex-info "Syntax error: 'drop' second argument has to be ISeqable (String, Array etc.)"
                                             {:query query})))
@@ -96,7 +96,7 @@
                                  (ex-info "Syntax error: 'split' must have two arguments"
                                           {:query query})))
         'get               (if (= 2 (count args))
-                             (take (drop (parse-int (first args)) (last args)))
+                             (take 1 (drop (- (parse-int (first args)) 1) (last args)))
                              (throw
                                (ex-info "Syntax error: 'get' must have two arguments"
                                         {:query query})))
@@ -178,7 +178,7 @@
                                  (ex-info "Syntax error: 'split' must have two arguments"
                                           {:query query})))
         'get               (if (= 2 (count args))
-                               (take (drop (parse-int (first args)) (last args)))
+                               (take 1 (drop (- (parse-int (first args)) 1) (last args)))
                                (throw
                                  (ex-info "Syntax error: 'get' must have two arguments"
                                           {:query query})))
@@ -231,23 +231,7 @@
 
 (defn read-query-clj [s]
   (try
-    (let [query    (edn/read-string s)
-          compiler (fn compile-query [query]
-                     (if (list? query)
-                       (let [[op & args] query]
-                         {:op   (compile-query op)
-                          :args (vec (map compile-query args))})
-                       query))]
-      #?(:cljs (if (and (not (number? query)) (not (string? query)))
-                  (with-meta (compiler query)
-                             {:query true})
-                  (compiler query))
-          :clj  (if (not (or (= java.lang.Long (type query))
-                             (= java.lang.Double (type query))
-                             (and (= java.lang.String (type query)))))
-                  (with-meta (compiler query)
-                             {:query true})
-                  (compiler query))))
+    (read-query s)
     (catch js/Error e (str "caught exception: " e))
     (catch js/Object e
       (str "Error: " e))))
