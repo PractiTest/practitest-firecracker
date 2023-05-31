@@ -1,9 +1,7 @@
 (ns practitest-firecracker.query-dsl
   (:require
    [clojure.string :as string]
-   [clojure.edn    :as edn]
-   #?(:clj [java.util.regex Pattern]
-      :cljs [goog.string :as gstring])))
+   [clojure.edn    :as edn]))
 
 
 (defn fix-abbreviations [tokens]
@@ -89,7 +87,7 @@
         'split               (if (= 2 (count args))
                                (let [quoted    #?(:clj  (str/escape (first args))
                                                   :cljs (first args))
-                                     complied  #?(:clj  (Pattern/compile quoted)
+                                     complied  #?(:clj  (java.util.regex.Pattern/compile quoted)
                                                   :cljs (js/RegExp. quoted))]
                                  (string/split (second args) complied))
                                (throw
@@ -171,7 +169,7 @@
         'split               (if (= 2 (count args))
                                (let [quoted    #?(:clj  (str/escape (first args))
                                                   :cljs (first args))
-                                     complied  #?(:clj  (Pattern/compile quoted)
+                                     complied  #?(:clj  (java.util.regex.Pattern/compile quoted)
                                                   :cljs (js/RegExp. quoted))]
                                  (string/split (second args) complied))
                                (throw
