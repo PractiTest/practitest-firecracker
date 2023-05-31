@@ -15,11 +15,11 @@
                  (not-empty (last results))
                  (every? #?(:clj    #(Character/isUpperCase %)
                             :cljs   #(.toUpperCase %))
-                             (last results))))
+                             (last results)))
           (recur (conj (vec (drop-last results))
                        (str (last results) head))
                  tail)
-          (recur (conj results head) tail)))))
+          (recur (conj results head) tail))))))
 
 (defn parse-int [s]
   #?(:clj (Integer. (re-find  #"\d+" s ))
