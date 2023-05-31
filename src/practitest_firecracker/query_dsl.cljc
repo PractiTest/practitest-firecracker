@@ -23,7 +23,7 @@
 
 (defn parse-int [s]
   #?(:clj (Integer. (re-find  #"\d+" s ))
-     :cljs (js/parseInt %)))
+     :cljs (js/parseInt (re-find  #"\d+" s ))))
 
 (defn eval-query [test-suite test-case query]
   (if (map? query)
@@ -119,12 +119,16 @@
                        {:op   (compile-query op)
                         :args (vec (map compile-query args))})
                      query))]
-    (if (not (or (= java.lang.Long (type query))
-                 (= java.lang.Double (type query))
-                 (and (= java.lang.String (type query)))))
-      (with-meta (compiler query)
-        {:query true})
-      (compiler query))))
+    #?(:clj  (if (not (or (= java.lang.Long (type query))
+                          (= java.lang.Double (type query))
+                          (and (= java.lang.String (type query)))))
+               (with-meta (compiler query)
+                          {:query true})
+               (compiler query))
+       :cljs (if (and (not (number? query)) (not (string? query)))
+               (with-meta (compiler query)
+                          {:query true})
+               (compiler query)))))
 
 (defn query? [obj]
   (boolean (:query (meta obj))))
