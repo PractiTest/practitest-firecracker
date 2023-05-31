@@ -90,7 +90,7 @@
                                (let [quoted    #?(:clj  (js/RegExp. (first args))
                                                   :cljs (first args))
                                      complied  #?(:clj  (Pattern/compile quoted)
-                                                  :cljs (gstring/re-pattern quoted))]
+                                                  :cljs (js/re-pattern quoted))]
                                  (string/split (second args) complied))
                                (throw
                                  (ex-info "Syntax error: 'split' must have two arguments"
