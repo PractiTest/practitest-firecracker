@@ -13,7 +13,9 @@
       (let [[head & tail] input]
         (if (and (= 1 (count head))
                  (not-empty (last results))
-                 (every? #(Character/isUpperCase %) (last results)))
+                 (every? #?(:clj #(Character/isUpperCase %)
+                            :cljs #(js/toUpperCase  %))
+                         (last results)))
           (recur (conj (vec (drop-last results))
                        (str (last results) head))
                  tail)
