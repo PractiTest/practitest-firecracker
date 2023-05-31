@@ -97,7 +97,7 @@
         (throw
          (ex-info
            #?(:clj (format "Syntax error: unsupported function '%s'" op)
-              :cljs (gstring/format "Syntax error: unsupported function '%s'" op))
+              :cljs (str "Syntax error: unsupported function: " op))
                   {:query query}))))
 
     (let [key (keyword (string/join (drop 1 (str query))))]
