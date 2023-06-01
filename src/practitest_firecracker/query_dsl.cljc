@@ -87,10 +87,10 @@
       (ex-info (str "Syntax error: unsupported function: " op)
                {:query query}))))
 
-(defn eval-query-clj [entity-hash query]
+(defn eval-query-clj [entity_hash query]
   (if (map? query)
     (let [{:keys [op args]} query
-          args              (map (partial eval-query-clj entity-hash) args)]
+          args              (map (partial eval-query-clj entity_hash) args)]
       (condp = op
         'tokenize-package    (if (= 1 (count args))
                                (string/split (first args) #"\.")
