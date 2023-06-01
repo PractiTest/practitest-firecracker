@@ -87,29 +87,26 @@
       (ex-info (str "Syntax error: unsupported function: " op)
                {:query query}))))
 
-(defn eval-query-clj [entity_hash query]
+(defn eval-query-clj [entity-hash query]
   (if (map? query)
     (let [{:keys [op args]} query
-          args              (map (partial eval-query-clj entity_hash) args)]
+          args              (map (partial eval-query-clj entity-hash) args)]
       (parse-methods op args query))
-    ;#?(:cljs
-       (cond
-               (= ?field query)                     val
-               ;(string/starts-with? (str query) "?") (throw
-               ;                                        (ex-info (str "Syntax error: unsupported variable " query)
-               ;                                                 {:query query}))
+    #?(:cljs (cond
+               (= '?field query)                     entity-hash
+               (string/starts-with? (str query) "?") (throw
+                                                       (ex-info (str "Syntax error: unsupported variable " query)
+                                                                {:query query}))
                (number? query)                       query
                :else                                 (str query))
-       ;:clj (let [key (keyword (string/join (drop 1 (str query))))]
-       ;       (cond
-       ;         (or (= :test-suite-name key)
-       ;             (= :test-case-name key))          (:name entity-hash)
-       ;         (and (not (= entity-hash nil))
-       ;              (contains? entity-hash key))          (key entity-hash)
-       ;         (string/starts-with? (str query) "?") (str "")
-       ;         :else                                 (str query)))
-    ))
-;)
+       :clj (let [key (keyword (string/join (drop 1 (str query))))]
+              (cond
+                (or (= :test-suite-name key)
+                    (= :test-case-name key))          (:name entity-hash)
+                (and (not (= entity-hash nil))
+                     (contains? entity-hash key))          (key entity-hash)
+                (string/starts-with? (str query) "?") (str "")
+                :else                                 (str query))))))
 
 (defn eval-query [entity-hash query]
   (if (map? query)
@@ -117,7 +114,7 @@
           args              (map (partial eval-query entity-hash) args)]
       (parse-methods op args query))
     #?(:cljs (cond
-               (= '?field query)                     val
+               (= '?field query)                     entity-hash
                (string/starts-with? (str query) "?") (throw
                                                        (ex-info (str "Syntax error: unsupported variable " query)
                                                                 {:query query}))
