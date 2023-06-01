@@ -85,7 +85,7 @@
                                  (ex-info "Syntax error: 'join' must have one argument"
                                           {:query query})))
         'split               (if (= 2 (count args))
-                               (let [quoted    #?(:clj  (str/escape (first args))
+                               (let [quoted    #?(:clj  (string/escape (first args))
                                                   :cljs (first args))
                                      complied  #?(:clj  (java.util.regex.Pattern/compile quoted)
                                                   :cljs (js/RegExp. quoted))]
@@ -167,7 +167,7 @@
                                 (ex-info "Syntax error: 'join' must have one argument"
                                          {:query query})))
         'split               (if (= 2 (count args))
-                               (let [quoted    #?(:clj  (str/escape (first args))
+                               (let [quoted    #?(:clj  (string/escape (first args))
                                                   :cljs (first args))
                                      complied  #?(:clj  (java.util.regex.Pattern/compile quoted)
                                                   :cljs (js/RegExp. quoted))]
@@ -228,11 +228,12 @@
                (compiler query)))))
 
 (defn read-query-clj [s]
-  (try
-    (read-query s)
-    (catch js/Error e (str "caught exception: " e))
-    (catch js/Object e
-      (str "Error: " e))))
+  #?(:cljs
+     (try
+       (read-query s)
+       (catch js/Error e (str "caught exception: " e))
+       (catch js/Object e
+         (str "Error: " e)))))
 
 (defn query? [obj]
   (boolean (:query (meta obj))))
