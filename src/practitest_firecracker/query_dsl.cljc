@@ -85,7 +85,7 @@
                                  (ex-info "Syntax error: 'join' must have one argument"
                                           {:query query})))
         'split               (if (= 2 (count args))
-                               (let [quoted    #?(:clj  (string/char-escape-string (first args))
+                               (let [quoted    #?(:clj  (char-escape-string (first args))
                                                   :cljs (first args))
                                      complied  #?(:clj  (java.util.regex.Pattern/compile quoted)
                                                   :cljs (js/RegExp. quoted))]
@@ -167,7 +167,7 @@
                                 (ex-info "Syntax error: 'join' must have one argument"
                                          {:query query})))
         'split               (if (= 2 (count args))
-                               (let [quoted    #?(:clj  (string/char-escape-string (first args))
+                               (let [quoted    #?(:clj  (char-escape-string (first args))
                                                   :cljs (first args))
                                      complied  #?(:clj  (java.util.regex.Pattern/compile quoted)
                                                   :cljs (js/RegExp. quoted))]
