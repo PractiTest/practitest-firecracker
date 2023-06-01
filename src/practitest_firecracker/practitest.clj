@@ -349,19 +349,20 @@
                       tests)}))
 
 (defn eval-additional-fields [suite additional-fields]
-  (postwalk #(if (query? %) (eval-query suite {} %) %)
+  (postwalk #(if (query? %) (eval-query suite %) %)
             additional-fields))
 
 (defn eval-additional-testset-fields [suite additional-fields]
-  (postwalk #(if (query? %) (eval-query suite {} %) %)
+  (postwalk #(if (query? %) (eval-query suite %) %)
             additional-fields))
 
 (defn sf-test-suite->pt-test-name [options suite]
-  (let [test-name (eval-query suite {} (:pt-test-name options))]
+  (let [test-name (eval-query suite (:pt-test-name options))]
     (if (string/blank? test-name) "UNNAMED" test-name)))
 
+{:entity entity}
 (defn sf-test-case->pt-step-name [options test-case]
-  (let [step-name (eval-query {} test-case (:pt-test-step-name options))]
+  (let [step-name (eval-query test-case (:pt-test-step-name options))]
     (if (string/blank? step-name) "UNNAMED" step-name)))
 
 (defn sf-test-case->step-def [options test-case]
