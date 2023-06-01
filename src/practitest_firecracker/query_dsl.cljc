@@ -86,10 +86,10 @@
     (return-error #?(:clj (format "Syntax error: unsupported function '%s'" op)
                      :cljs (str "Syntax error: unsupported function: " op)) query)))
 
-(defn eval-query-clj [entity query]
+(defn eval-query-clj [entity-hash query]
   (if (map? query)
     (let [{:keys [op args]} query
-          args              (map (partial eval-query-clj entity) args)]
+          args              (map (partial eval-query-clj entity-hash) args)]
       (parse-methods op args query))
     #?(:cljs (cond
                (= '?field query)                     val
@@ -101,16 +101,16 @@
        :clj (let [key (keyword (string/join (drop 1 (str query))))]
               (cond
                 (or (= :test-suite-name key)
-                    (= :test-case-name key))          (:name entity)
-                (and (not (= entity nil))
-                     (contains? entity key))          (key entity)
+                    (= :test-case-name key))          (:name entity-hash)
+                (and (not (= entity-hash nil))
+                     (contains? entity-hash key))          (key entity-hash)
                 (string/starts-with? (str query) "?") (str "")
                 :else                                 (str query))))))
 
-(defn eval-query [entity query]
+(defn eval-query [entity-hash query]
   (if (map? query)
     (let [{:keys [op args]} query
-          args              (map (partial eval-query entity) args)]
+          args              (map (partial eval-query entity-hash) args)]
       (parse-methods op args query))
     #?(:cljs (cond
                (= '?field query)                     val
@@ -122,9 +122,9 @@
        :clj (let [key (keyword (string/join (drop 1 (str query))))]
               (cond
                 (or (= :test-suite-name key)
-                    (= :test-case-name key))          (:name entity)
-                (and (not (= entity nil))
-                     (contains? entity key))          (key entity)
+                    (= :test-case-name key))          (:name entity-hash)
+                (and (not (= entity-hash nil))
+                     (contains? entity-hash key))     (key entity-hash)
                 (string/starts-with? (str query) "?") (str "")
                 :else                                 (str query))))))
 

@@ -360,7 +360,6 @@
   (let [test-name (eval-query suite (:pt-test-name options))]
     (if (string/blank? test-name) "UNNAMED" test-name)))
 
-{:entity entity}
 (defn sf-test-case->pt-step-name [options test-case]
   (let [step-name (eval-query test-case (:pt-test-step-name options))]
     (if (string/blank? step-name) "UNNAMED" step-name)))
