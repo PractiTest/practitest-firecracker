@@ -126,7 +126,7 @@
                           {:query true})
                (compiler query)))))
 
-(defn read-query-clj [s]
+(defn try-read-query [s]
   #?(:cljs
      (try
        (read-query s)
