@@ -83,8 +83,9 @@
     'trim               (if (= 1 (count args))
                           (string/trim (first args))
                           (return-error "Syntax error: 'trim' must have only one argument" query))
-    (return-error #?(:clj (format "Syntax error: unsupported function '%s'" op)
-                     :cljs (str "Syntax error: unsupported function: " op)) query)))
+    (throw
+      (ex-info (str "Syntax error: unsupported function: " op)
+               {:query query}))))
 
 (defn eval-query-clj [entity-hash query]
   (if (map? query)
