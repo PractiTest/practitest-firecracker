@@ -86,27 +86,6 @@
     (return-error #?(:clj (format "Syntax error: unsupported function '%s'" op)
                      :cljs (str "Syntax error: unsupported function: " op)) query)))
 
-(defn eval-query-clj [entity query]
-  (if (map? query)
-    (let [{:keys [op args]} query
-          args              (map (partial eval-query-clj entity) args)]
-      (parse-methods op args query))
-    #?(:cljs (cond
-               (= '?field query)                     entity
-               (string/starts-with? (str query) "?") (throw
-                                                       (ex-info (str "Syntax error: unsupported variable " query)
-                                                                {:query query}))
-               (number? query)                       query
-               :else                                 (str query))
-       :clj (let [key (keyword (string/join (drop 1 (str query))))]
-              (cond
-                (or (= :test-suite-name key)
-                    (= :test-case-name key))          (:name entity)
-                (and (not (= entity-hash nil))
-                     (contains? entity-hash key))          (key entity)
-                (string/starts-with? (str query) "?") (str "")
-                :else                                 (str query))))))
-
 (defn eval-query [entity-hash query]
   (if (map? query)
     (let [{:keys [op args]} query
