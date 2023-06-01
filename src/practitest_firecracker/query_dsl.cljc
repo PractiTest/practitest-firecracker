@@ -94,7 +94,7 @@
       (parse-methods op args query))
     ;#?(:cljs
        (cond
-               (= '?field query)                     val
+               (= ?field query)                     val
                ;(string/starts-with? (str query) "?") (throw
                ;                                        (ex-info (str "Syntax error: unsupported variable " query)
                ;                                                 {:query query}))
