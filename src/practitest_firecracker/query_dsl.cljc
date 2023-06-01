@@ -94,59 +94,82 @@
       (condp = op
         'tokenize-package    (if (= 1 (count args))
                                (string/split (first args) #"\.")
-                               (return-error "Syntax error: 'tokenize-package' must have one argument" query))
+                               (str "Syntax error: 'tokenize-package' must have one argument " query))
         'tokenize-class-name (if (= 1 (count args))
                                (->> (string/split (first args) #"(?=[A-Z])")
                                     (map #(string/replace % "_" ""))
                                     (remove string/blank?)
-                                    fix-abbreviations)
-                               (return-error "Syntax error: 'tokenize-class-name' must have one argument" query))
+                                    fix-abbreviations
+                                    )
+                               (str "Syntax error: 'tokenize-class-name' must have one argument " query))
         'take                (if (= 2 (count args))
                                (if (or (string? (last args)) (coll? (last args)))
-                                 (take (parse-int (first args)) (last args))
-                                 (return-error "Syntax error: 'take' second argument has to be ISeqable (String, Array etc.)" query))
-                               (return-error "Syntax error: 'take' must have two arguments" query))
+                                 (take (js/parseInt (first args)) (last args))
+                                 (throw
+                                   (ex-info "Syntax error: 'take' second argument has to be ISeqable (String, Array etc.)"
+                                            {:query query})))
+                               (throw
+                                 (ex-info "Syntax error: 'take' must have two arguments"
+                                          {:query query})))
         'drop                (if (= 2 (count args))
                                (if (or (string? (last args)) (coll? (last args)))
-                                 (drop (parse-int (first args)) (last args))
-                                 (return-error "Syntax error: 'drop' second argument has to be ISeqable (String, Array etc.)" query))
-                               (return-error "Syntax error: 'drop' must have two arguments" query))
+                                 (drop (js/parseInt (first args)) (last args))
+                                 (throw
+                                   (ex-info "Syntax error: 'drop' second argument has to be ISeqable (String, Array etc.)"
+                                            {:query query})))
+                               (throw
+                                 (ex-info "Syntax error: 'drop' must have two arguments"
+                                          {:query query})))
         'drop-last           (if (<= 1 (count args) 2)
                                (if (or (string? (last args)) (coll? (last args)))
                                  (apply drop-last args)
-                                 (return-error "Syntax error: 'drop-last' second argument has to be ISeqable (String, Array etc.)" query))
-                               (return-error "Syntax error: 'drop-last' must have one or two arguments" query))
-        'take-last           (case (count args)
-                               1 (take-last 1 (first args))
-                               2 (take-last (first args) (second args))
-                               (return-error "Syntax error: 'take-last' must have one or two arguments" query))
+                                 (throw
+                                   (ex-info "Syntax error: 'drop-last' second argument has to be ISeqable (String, Array etc.)"
+                                            {:query query})))
+                               (throw
+                                 (ex-info "Syntax error: 'drop-last' must have one or two arguments"
+                                          {:query query})))
         'concat              (apply str args)
         'capitalize          (if (= 1 (count args))
                                (if (or (string? (last args)) (coll? (last args)))
                                  (map string/capitalize (first args))
-                                 (return-error "Syntax error: 'capitalize' argument has to be ISeqable (String, Array etc.)" query))
-                               (return-error "Syntax error: 'capitalize' must have one argument" query))
+                                 (throw
+                                   (ex-info "Syntax error: 'capitalize' argument has to be ISeqable (String, Array etc.)"
+                                            {:query query})))
+                               (throw
+                                 (ex-info "Syntax error: 'capitalize' must have one argument"
+                                          {:query query})))
         'join                (if (= 1 (count args))
                                (if (or (string? (last args)) (coll? (last args)))
                                  (string/join (first args))
-                                 (return-error "Syntax error: 'join' argument has to be ISeqable (String, Array etc.)" query))
-                               (return-error "Syntax error: 'join' must have one argument" query))
+                                 (throw
+                                   (ex-info "Syntax error: 'join' argument has to be ISeqable (String, Array etc.)"
+                                            {:query query})))
+                               (throw
+                                 (ex-info "Syntax error: 'join' must have one argument"
+                                          {:query query})))
         'split               (if (= 2 (count args))
-                               (let [quoted    #?(:clj  (string/escape (first args) char-escape-string)
-                                                  :cljs (first args))
-                                     complied  #?(:clj  (java.util.regex.Pattern/compile quoted)
-                                                  :cljs (js/RegExp. quoted))]
+                               (let [quoted    (js/RegExp.    (first args))
+                                     (string/replace "The color is red." #"[(?^$]]"  #(str "\\" %1))
+                                     complied  (Pattern/compile  quoted)]
                                  (string/split (second args) complied))
-                               (return-error "Syntax error: 'split' must have two arguments" query))
+                               (throw
+                                 (ex-info "Syntax error: 'split' must have two arguments"
+                                          {:query query})))
         'get               (if (= 2 (count args))
-                             (take 1 (drop (- (parse-int (first args)) 1) (last args)))
-                             (return-error "Syntax error: 'get' must have two arguments" query))
+                             (take (drop (parse-int (first args)) (last args)))
+                             (throw
+                               (ex-info "Syntax error: 'get' must have two arguments"
+                                        {:query query})))
         'trim               (if (= 1 (count args))
                               (string/trim (first args))
-                              (return-error "Syntax error: 'trim' must have only one argument" query))
+                              (throw
+                                (ex-info "Syntax error: 'trim' must have only one argument"
+                                         {:query query})))
         (throw
           (ex-info (str "Syntax error: unsupported function: " op)
-                   {:query query}))))
+                   {:query query}))
+        ))
     ;#?(:cljs
        (cond
                (= '?field query)                     val
