@@ -91,12 +91,13 @@
     (let [{:keys [op args]} query
           args              (map (partial eval-query entity-hash) args)]
       (parse-methods op args query))
-    #?(:cljs (cond
-               (= '?field query)                     entity-hash
-               (and (not (= entity-hash nil))
-                    (contains? entity-hash key))     (key entity-hash)
-               (number? query)                       query
-               :else                                 (str query))
+    #?(:cljs  (let [key (keyword (string/join (drop 1 (str query))))]
+                   (cond
+                     (= '?field query)                     entity-hash
+                     (and (not (= entity-hash nil))
+                          (contains? entity-hash key))     (key entity-hash)
+                     (number? query)                       query
+                     :else                                 (str query)))
        :clj (let [key (keyword (string/join (drop 1 (str query))))]
               (cond
                 (or (= :test-suite-name key)
