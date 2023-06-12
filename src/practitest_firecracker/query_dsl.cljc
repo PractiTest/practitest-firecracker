@@ -92,7 +92,7 @@
           args              (map (partial eval-query entity-hash) args)]
       (parse-methods op args query))
     #?(:cljs (cond
-               (= '?field query)                     val
+               (= '?field query)                     entity-hash
                (string/starts-with? (str query) "?") (throw
                                                        (ex-info (str "Syntax error: unsupported variable " query)
                                                                 {:query query}))
