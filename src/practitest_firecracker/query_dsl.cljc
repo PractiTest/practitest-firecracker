@@ -93,9 +93,6 @@
       (parse-methods op args query))
     #?(:cljs (cond
                (= '?field query)                     entity-hash
-               (string/starts-with? (str query) "?") (throw
-                                                       (ex-info (str "Syntax error: unsupported variable " query)
-                                                                {:query query}))
                (number? query)                       query
                :else                                 (str query))
        :clj (let [key (keyword (string/join (drop 1 (str query))))]
