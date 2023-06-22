@@ -12,7 +12,7 @@
    [practitest-firecracker.parser.core :refer [send-directory parse-files]]
    [practitest-firecracker.utils       :refer [exit]]
    [clojure.pprint                     :as     pprint]
-   [clojure.java.io                    :refer [file]]
+   [clojure.java.io                    :as     io]
    [clj-time.core                      :as     t])
   (:gen-class))
 
@@ -30,7 +30,7 @@
       (exit (if ok? 0 1) exit-message)
       (let [client             (make-client (select-keys options [:email :api-token :api-uri :max-api-rate]))
             directory          (:reports-path options)
-            dirs               (when-not (nil? directory) (for [dir directory] (clojure.java.io/file dir)))
+            dirs               (when-not (nil? directory) (for [dir directory] (io/file dir)))
             parsed-dirs        (when-not (nil? dirs) (for [dir (file-seq (first dirs))] (parse-files dir)))
             additional-reports (send-directory parsed-dirs (:test-case-as-pt-test-step options) (:multitestset options) (:testset-name options) false)
             start-time         (t/now)]

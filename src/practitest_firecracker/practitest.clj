@@ -1,15 +1,21 @@
 (ns practitest-firecracker.practitest
   (:require
-   [clojure.string                   :as string]
-   [clojure.set                      :refer [difference]]
-   [clojure.walk                     :refer [postwalk]]
-   [clj-http.client                  :as http]
-   [clojure.tools.logging            :as log]
-   [cheshire.core                    :as json]
-   [practitest-firecracker.query-dsl :refer [query? eval-query]]
-   [throttler.core                   :refer [fn-throttler]]
-   [practitest-firecracker.utils     :refer [parse-id print-run-time test-need-update? exit group-errors]]
-   [clojure.pprint                   :as     pprint]))
+    [clojure.string :as string]
+    [clojure.set :refer [difference]]
+    [clojure.walk :refer [postwalk]]
+    [clj-http.client :as http]
+    [clojure.tools.logging :as log]
+    [cheshire.core :as json]
+    [practitest-firecracker.query-dsl :refer [query? eval-query]]
+    [throttler.core :refer [fn-throttler]]
+    [practitest-firecracker.utils :refer [parse-id print-run-time test-need-update? exit group-errors]]
+    [clojure.pprint :as pprint]
+    [lambdaisland.cucumber.dsl :refer :all]
+    )
+  ;(:import [lein-cucumber.Parser]
+  ;         [lein-cucumber.ast.Feature]
+  ;         [lein-cucumber.pickles.Pickle])
+  )
 
 ;; ===========================================================================
 ;; api version
@@ -17,6 +23,11 @@
 
 ;; ===========================================================================
 ;; utils
+
+
+(defn pformat [& args]
+  (with-out-str
+    (apply pprint/pprint args)))
 
 (def backoff-timeout "Backoff timeout in seconds" 20)
 (def max-attempts "Number of attempts to run" 10)
@@ -38,14 +49,14 @@
 (defn api-call [{:keys [credentials uri method query-params form-params]}]
   (assert (not (and query-params form-params))
           "both `query-params` and `form-params` can't be specified")
-  (loop [results  []
-         uri      uri
+  (loop [results []
+         uri uri
          attempts max-attempts
-         params   (cond-> {:basic-auth          credentials
-                           :throw-exceptions    false
-                           :as                  :json}
-                    query-params (assoc :query-params (conj query-params {:source "firecracker" :firecracker-version fc-version}) )
-                    form-params  (assoc :form-params (conj form-params {:source "firecracker" :firecracker-version fc-version}) :content-type :json))]
+         params (cond-> {:basic-auth       credentials
+                         :throw-exceptions false
+                         :as               :json}
+                        query-params (assoc :query-params (conj query-params {:source "firecracker" :firecracker-version fc-version}))
+                        form-params (assoc :form-params (conj form-params {:source "firecracker" :firecracker-version fc-version}) :content-type :json))]
     (if (nil? uri)
       results
       (let [{:keys [status body]} (method uri params)]
@@ -76,9 +87,9 @@
                   (recur results uri (dec attempts) params))
             200 (let [data (:data body)]
                   (recur (vec
-                          (if (sequential? data)
-                            (concat results data)
-                            (conj results data)))
+                           (if (sequential? data)
+                             (concat results data)
+                             (conj results data)))
                          (get-in body [:links :next])
                          attempts
                          (dissoc params :query-params)))
@@ -124,9 +135,9 @@
                                                          (Long/parseLong id)
                                                          id))]
     (first
-     (api-call {:credentials  credentials
-                :uri          uri
-                :method       (max-api-rate-throttler http/get)}))))
+      (api-call {:credentials credentials
+                 :uri         uri
+                 :method      (max-api-rate-throttler http/get)}))))
 
 (defn ll-testset-instances [{:keys [base-uri credentials max-api-rate-throttler]} [project-id display-action-logs] testset-id test-ids]
   (when display-action-logs (log/infof "get instances from testsets %s" testset-id))
@@ -135,19 +146,20 @@
                :uri          uri
                :method       (max-api-rate-throttler http/get)
                :query-params (cond-> {:set-ids testset-id}
-                               test-ids (assoc :test-ids test-ids))})))
+                                     test-ids (assoc :test-ids test-ids))})))
 
 (defn ll-test [{:keys [base-uri credentials max-api-rate-throttler]} project-id id]
   ;; (log/infof "create step %s" id)
   (let [uri (build-uri base-uri test-uri project-id id)]
     (first
-     (api-call {:credentials  credentials
-                :uri          uri
-                :method       (max-api-rate-throttler http/get)}))))
+      (api-call {:credentials credentials
+                 :uri         uri
+                 :method      (max-api-rate-throttler http/get)}))))
 
 (defn ll-test-steps [{:keys [base-uri credentials max-api-rate-throttler]} project-id test-id]
-  ;; (log/infof "create step %s" test-id)
+  (log/info "ll-test-steps %s" (pformat test-id))
   (let [uri (build-uri base-uri test-steps-uri project-id)]
+    (log/info "IN HERE uri:" (pformat uri))
     (api-call {:credentials  credentials
                :uri          uri
                :method       (max-api-rate-throttler http/get)
@@ -157,10 +169,10 @@
   ;; (log/infof "create test %s" (:name attributes))
   (let [uri (build-uri base-uri create-test-uri project-id)]
     (first
-     (api-call {:credentials  credentials
-                :uri          uri
-                :method       (max-api-rate-throttler http/post)
-                :form-params  {:data {:type       "tests"
+      (api-call {:credentials credentials
+                 :uri         uri
+                 :method      (max-api-rate-throttler http/post)
+                 :form-params {:data {:type       "tests"
                                       :attributes attributes
                                       :steps      {:data steps}}}}))))
 
@@ -168,10 +180,10 @@
   ;; (log/infof "create testset %s" (:name attributes))
   (let [uri (build-uri base-uri create-testset-uri project-id)]
     (first
-     (api-call {:credentials  credentials
-                :uri          uri
-                :method       (max-api-rate-throttler http/post)
-                :form-params  {:data {:type       "sets"
+      (api-call {:credentials credentials
+                 :uri         uri
+                 :method      (max-api-rate-throttler http/post)
+                 :form-params {:data {:type       "sets"
                                       :attributes attributes
                                       :instances  {:test-ids test-ids}}}}))))
 
@@ -180,17 +192,17 @@
         test-id-num test-ids-num
         index (range (last test-id-num))]
     {:type       "instances"
-     :attributes {:set-id testset-id
+     :attributes {:set-id  testset-id
                   :test-id (first test-id-num)}}))
 
 (defn ll-create-instance [{:keys [base-uri credentials max-api-rate-throttler]} project-id testset-id test-id]
   ;; (log/infof "create instance for testset-id %s and test-id %s" testset-id test-id)
   (let [uri (build-uri base-uri create-instance-uri project-id)]
     (first
-     (api-call {:credentials  credentials
-                :uri          uri
-                :method       (max-api-rate-throttler http/post)
-                :form-params  {:data {:type       "instances"
+      (api-call {:credentials credentials
+                 :uri         uri
+                 :method      (max-api-rate-throttler http/post)
+                 :form-params {:data {:type       "instances"
                                       :attributes {:set-id  testset-id
                                                    :test-id test-id}}}}))))
 
@@ -201,19 +213,19 @@
 (defn ll-create-instances [{:keys [base-uri credentials max-api-rate-throttler]} [project-id display-action-logs] instances]
   (when display-action-logs (log/infof "create instances"))
   (let [uri (build-uri base-uri create-instance-uri project-id)]
-    (api-call {:credentials  credentials
-               :uri          uri
-               :method       (max-api-rate-throttler http/post)
-               :form-params  {:data instances}})))
+    (api-call {:credentials credentials
+               :uri         uri
+               :method      (max-api-rate-throttler http/post)
+               :form-params {:data instances}})))
 
 (defn ll-create-run [{:keys [base-uri credentials max-api-rate-throttler]} [project-id display-action-logs] instance-id attributes steps]
   (when display-action-logs (log/infof "create run for instance %s" instance-id))
   (let [uri (build-uri base-uri create-run-uri project-id)]
     (first
-     (api-call {:credentials  credentials
-                :uri          uri
-                :method       (max-api-rate-throttler http/post)
-                :form-params  {:data {:type       "instances"
+      (api-call {:credentials credentials
+                 :uri         uri
+                 :method      (max-api-rate-throttler http/post)
+                 :form-params {:data {:type       "instances"
                                       :attributes (merge attributes {:instance-id instance-id})
                                       :steps      {:data steps}}}}))))
 
@@ -221,22 +233,22 @@
   (when display-action-logs (log/infof "create runs"))
   (let [uri (build-uri base-uri create-run-uri project-id)]
     (if (has-duplicates? :instance-id runs)
-      (let [grouped    (group-by :instance-id runs)
+      (let [grouped (group-by :instance-id runs)
             duplicates (map first (vals (into {} (filter #(> (count (last %)) 1) grouped))))
-            uniq       (map first (vals (into {} (filter #(= (count (last %)) 1) grouped))))]
+            uniq (map first (vals (into {} (filter #(= (count (last %)) 1) grouped))))]
         (do (doall
-             (for [run duplicates]
-               (ll-create-run {:base-uri base-uri :credentials credentials :max-api-rate-throttler max-api-rate-throttler} [project-id display-action-logs] (:instance-id run) (:attributes run) (:steps run))))
+              (for [run duplicates]
+                (ll-create-run {:base-uri base-uri :credentials credentials :max-api-rate-throttler max-api-rate-throttler} [project-id display-action-logs] (:instance-id run) (:attributes run) (:steps run))))
             (ll-create-runs {:base-uri base-uri :credentials credentials :max-api-rate-throttler max-api-rate-throttler} [project-id display-action-logs] uniq)))
-      (api-call {:credentials  credentials
-                 :uri          uri
-                 :method       (max-api-rate-throttler http/post)
-                 :form-params  {:data
-                                (reduce conj []
-                                        (doall (for [run (into () runs)]
-                                                 {:type       "instances"
-                                                  :attributes (assoc (:attributes run) :instance-id (:instance-id run))
-                                                  :steps      {:data (reduce conj [] (:steps run))}})))}}))))
+      (api-call {:credentials credentials
+                 :uri         uri
+                 :method      (max-api-rate-throttler http/post)
+                 :form-params {:data
+                               (reduce conj []
+                                       (doall (for [run (into () runs)]
+                                                {:type       "instances"
+                                                 :attributes (assoc (:attributes run) :instance-id (:instance-id run))
+                                                 :steps      {:data (reduce conj [] (:steps run))}})))}}))))
 
 
 (defn create-runs [runs client options start-time]
@@ -246,66 +258,66 @@
 (defn ll-find-tests [{:keys [base-uri credentials max-api-rate-throttler]} [project-id display-action-logs] name-list]
   (when display-action-logs (log/infof "searching for testsets"))
   (let [uri (build-uri base-uri bulk-list-tests-uri project-id)]
-    (api-call {:credentials  credentials
-               :uri          uri
-               :method       (max-api-rate-throttler http/post)
-               :form-params  {:data name-list}})))
+    (api-call {:credentials credentials
+               :uri         uri
+               :method      (max-api-rate-throttler http/post)
+               :form-params {:data name-list}})))
 
 (defn ll-find-test [{:keys [base-uri credentials max-api-rate-throttler]} [project-id display-action-logs] name]
   (when display-action-logs (log/infof "searching for test %s" name))
   (let [uri (build-uri base-uri list-tests-uri project-id)]
     ;; in case there are more than one test with this name, return the first one
     (first
-     (api-call {:credentials  credentials
-                :uri          uri
-                :method       (max-api-rate-throttler http/get)
-                :query-params {:name_exact name}}))))
+      (api-call {:credentials  credentials
+                 :uri          uri
+                 :method       (max-api-rate-throttler http/get)
+                 :query-params {:name_exact name}}))))
 
 (defn ll-find-instance [{:keys [base-uri credentials max-api-rate-throttler]} [project-id display-action-logs] testset-id test-id]
   (when display-action-logs (log/infof "searching for instance by test-id %s and testset-id %s" test-id testset-id))
   (let [uri (build-uri base-uri testset-instances-uri (parse-id project-id))]
     (first
-     (api-call {:credentials  credentials
-                :uri          uri
-                :method       (max-api-rate-throttler http/get)
-                :query-params {:set-ids  (parse-id testset-id)
-                               :test-ids (parse-id test-id)}}))))
+      (api-call {:credentials  credentials
+                 :uri          uri
+                 :method       (max-api-rate-throttler http/get)
+                 :query-params {:set-ids  (parse-id testset-id)
+                                :test-ids (parse-id test-id)}}))))
 
 (defn ll-find-testset [{:keys [base-uri credentials max-api-rate-throttler]} [project-id display-action-logs] name]
   (when display-action-logs (log/infof "searching for testset %s" name))
   (let [uri (build-uri base-uri list-testsets-uri project-id)]
     (first
-     (api-call {:credentials  credentials
-                :uri          uri
-                :method       (max-api-rate-throttler http/get)
-                :query-params {:name_exact name}}))))
+      (api-call {:credentials  credentials
+                 :uri          uri
+                 :method       (max-api-rate-throttler http/get)
+                 :query-params {:name_exact name}}))))
 
 (defn ll-get-custom-field [{:keys [base-uri credentials max-api-rate-throttler]} [project-id display-action-logs] cf-id]
   (when display-action-logs (log/infof "searching custom field %s" cf-id))
   (let [uri (build-uri base-uri custom-field-uri project-id cf-id)]
     (first
-     (api-call {:credentials  credentials
-                :uri          uri
-                :method       (max-api-rate-throttler http/get)}))))
+      (api-call {:credentials credentials
+                 :uri         uri
+                 :method      (max-api-rate-throttler http/get)}))))
 
 (defn ll-update-custom-field [{:keys [base-uri credentials max-api-rate-throttler]} [project-id display-action-logs] cf-id possible-values]
   (when display-action-logs (log/infof "update custom field %s to possible-values: %s" cf-id possible-values))
   (let [uri (build-uri base-uri custom-field-uri project-id cf-id)]
     (first
-     (api-call {:credentials  credentials
-                :uri          uri
-                :method       (max-api-rate-throttler http/put)
-                :form-params  {:data {:type       "custom_field"
+      (api-call {:credentials credentials
+                 :uri         uri
+                 :method      (max-api-rate-throttler http/put)
+                 :form-params {:data {:type       "custom_field"
                                       :attributes {:possible-values possible-values}}}}))))
 
 (defn ll-update-test [{:keys [base-uri credentials max-api-rate-throttler]} [project-id display-action-logs] attributes steps cf-id]
   (when display-action-logs (log/infof "update test %s in custom field id %s" (:name attributes) cf-id))
   (let [uri (build-uri base-uri update-test-uri project-id cf-id)]
     (first
-     (api-call {:credentials  credentials
-                :uri          uri
-                :method       (max-api-rate-throttler http/put)
-                :form-params  {:data {:type       "tests"
+      (api-call {:credentials credentials
+                 :uri         uri
+                 :method      (max-api-rate-throttler http/put)
+                 :form-params {:data {:type       "tests"
                                       :attributes attributes
                                       :steps      {:data steps}}}}))))
 
@@ -313,22 +325,22 @@
   (when display-action-logs (log/infof "update testset %s in field id %s" (:name attributes) cf-id))
   (let [uri (build-uri base-uri update-testset-uri project-id cf-id)]
     (first
-     (api-call {:credentials  credentials
-                :uri          uri
-                :method       (max-api-rate-throttler http/put)
-                :form-params  {:data {:type       "sets"
+      (api-call {:credentials credentials
+                 :uri         uri
+                 :method      (max-api-rate-throttler http/put)
+                 :form-params {:data {:type       "sets"
                                       :attributes attributes
                                       :steps      {:data steps}}}}))))
 
 (defn testset [client project-id id]
-  (let [testset   (ll-testset client project-id id)
+  (let [testset (ll-testset client project-id id)
         instances (ll-testset-instances client [project-id true] id nil)
-        tests     (->> instances
-                       (map #(get-in % [:attributes :test-id]))
-                       (remove nil?)
-                       (map #(ll-test client project-id %))
-                       (map (fn [{:keys [id] :as t}]
-                              (assoc t :steps (ll-test-steps client project-id id)))))]
+        tests (->> instances
+                   (map #(get-in % [:attributes :test-id]))
+                   (remove nil?)
+                   (map #(ll-test client project-id %))
+                   (map (fn [{:keys [id] :as t}]
+                          (assoc t :steps (ll-test-steps client project-id id)))))]
     {:id         id
      :display-id (get-in testset [:attributes :display-id])
      :name       (get-in testset [:attributes :name])
@@ -349,10 +361,6 @@
                       tests)}))
 
 (defn eval-additional-fields [suite additional-fields]
-  (postwalk #(if (query? %) (eval-query suite %) %)
-            additional-fields))
-
-(defn eval-additional-testset-fields [suite additional-fields]
   (postwalk #(if (query? %) (eval-query suite %) %)
             additional-fields))
 
@@ -377,9 +385,9 @@
 
 (defn ensure-custom-field-values [client [project-id display-action-logs] custom-fields]
   (doseq [[cf v] custom-fields
-          :let   [cf-id (some-> (last (re-find #"^---f-(\d+)$" (name cf)))
-                                (Long/parseLong))]
-          :when  (not (nil? cf-id))]
+          :let [cf-id (some-> (last (re-find #"^---f-(\d+)$" (name cf)))
+                              (Long/parseLong))]
+          :when (not (nil? cf-id))]
     (when-not (contains? @custom-field-cache cf-id)
       (let [cf (ll-get-custom-field client [project-id display-action-logs] cf-id)]
         (swap! custom-field-cache assoc cf-id [(get-in cf [:attributes :field-format])
@@ -391,8 +399,8 @@
           (ll-update-custom-field client [project-id display-action-logs] cf-id (vec (conj possible-values v))))))))
 
 (defn create-sf-test [client {:keys [project-id display-action-logs] :as options} sf-test-suite]
-  (let [[test-def step-defs]   (sf-test-suite->test-def options sf-test-suite)
-        test                   (ll-find-test client [project-id display-action-logs] (:name test-def))
+  (let [[test-def step-defs] (sf-test-suite->test-def options sf-test-suite)
+        test (ll-find-test client [project-id display-action-logs] (:name test-def))
         additional-test-fields (eval-additional-fields sf-test-suite (:additional-test-fields options))
         additional-test-fields (merge additional-test-fields (:system-fields additional-test-fields))]
     (ensure-custom-field-values client [project-id display-action-logs] (:custom-fields additional-test-fields))
@@ -406,7 +414,7 @@
                       step-defs))))
 
 (defn update-sf-test [client {:keys [project-id display-action-logs] :as options} sf-test-suite test-id]
-  (let [[test-def step-defs]   (sf-test-suite->test-def options sf-test-suite)
+  (let [[test-def step-defs] (sf-test-suite->test-def options sf-test-suite)
         additional-test-fields (eval-additional-fields sf-test-suite (:additional-test-fields options))
         additional-test-fields (merge additional-test-fields (:system-fields additional-test-fields))]
     (ensure-custom-field-values client [project-id display-action-logs] (:custom-fields additional-test-fields))
@@ -419,9 +427,9 @@
                     test-id)))
 
 (defn update-sf-testset [client {:keys [project-id display-action-logs] :as options} testset-name sf-test-suite testset-id]
-  (let [[test-def step-defs]       (sf-test-suite->test-def options sf-test-suite)
-        additional-testset-fields  (:additional-testset-fields options)
-        additional-testset-fields  (merge additional-testset-fields (:system-fields additional-testset-fields))]
+  (let [[test-def step-defs] (sf-test-suite->test-def options sf-test-suite)
+        additional-testset-fields (:additional-testset-fields options)
+        additional-testset-fields (merge additional-testset-fields (:system-fields additional-testset-fields))]
     (ensure-custom-field-values client [project-id display-action-logs] (:custom-fields additional-testset-fields))
     (ll-update-testset client
                        [project-id display-action-logs]
@@ -433,9 +441,9 @@
                        testset-id)))
 
 (defn create-sf-testset [client options sf-test-suites testset-name]
-  (let [tests                      (map (partial create-sf-test client options) sf-test-suites)
-        additional-testset-fields  (:additional-testset-fields options)
-        additional-testset-fields  (merge additional-testset-fields (:system-fields additional-testset-fields))]
+  (let [tests (map (partial create-sf-test client options) sf-test-suites)
+        additional-testset-fields (:additional-testset-fields options)
+        additional-testset-fields (merge additional-testset-fields (:system-fields additional-testset-fields))]
     (ll-create-testset client
                        (:project-id options)
                        (merge {:name testset-name}
@@ -447,10 +455,10 @@
   ;; if not -- throw exception, the user will need to create another testset
   ;; otherwise -- go on
   (let [instances (ll-testset-instances client [project-id display-action-logs] testset-id nil)
-        tests     (map (fn [test-suite]
-                         (let [name (:name test-suite)]
-                           [name (ll-find-test client [project-id display-action-logs] name)]))
-                       sf-test-suites)
+        tests (map (fn [test-suite]
+                     (let [name (:name test-suite)]
+                       [name (ll-find-test client [project-id display-action-logs] name)]))
+                   sf-test-suites)
         nil-tests (filter #(nil? (last %)) tests)]
     (when (seq nil-tests)
       (throw (ex-info (format "some tests do not exist in PT: %s"
@@ -463,38 +471,45 @@
     true))
 
 (defn sf-test-case->run-step-def [options test-case]
+  (log/info "IN HERE sf-test-case->run-step-def test-case: " (pformat test-case))
   {:name           (sf-test-case->pt-step-name options test-case)
    :actual-results (str (:failure-message test-case) \newline (:failure-detail test-case))
    :status         (case (:failure-type test-case)
                      :failure "FAILED"
                      :skipped "N/A"
-                     :error   "FAILED"
+                     :error "FAILED"
                      ;; will leave error as FAILED for now, will change it after we add the UI changes and add the option of ERROR to Reqirement Test and TestSet table of runs
-                     nil       "PASSED"
+                     nil "PASSED"
                      "NO RUN")})
 
 (defn sf-test-suite->run-def [options test-suite]
+  (log/info "IN HERE sf-test-suite->run-def")
+  (log/info "IN HERE test-suite: " (pformat test-suite))
   [{:run-duration (:time-elapsed test-suite)}
    (map (partial sf-test-case->run-step-def options) (:test-cases test-suite))])
 
 (defn sf-test-run->run-def [custom-fields run-duration]
-  {:run-duration (:time-elapsed run-duration),
+  {:run-duration  (:time-elapsed run-duration),
    :custom-fields (:custom-fields custom-fields)})
 
 (defn make-runs [[test-by-id instance-to-ts-test] client {:keys [project-id display-action-logs] :as options} start-time]
   (when display-action-logs (log/infof "make-runs"))
   (flatten (doall
-            (for [[test-testset instances] instance-to-ts-test]
-              (for [instance instances]
-                (let [[ts-id test-id] test-testset
-                      tst (first (get test-by-id test-id))
-                      [run run-steps] (sf-test-suite->run-def options (get tst 1))
-                      additional-run-fields (eval-additional-fields run (:additional-run-fields options))
-                      additional-run-fields (merge additional-run-fields (:system-fields additional-run-fields))
-                      run (sf-test-run->run-def additional-run-fields (get tst 1))]
-                  {:instance-id (:id instance)
-                   :attributes run
-                   :steps run-steps}))))))
+             (for [[test-testset instances] instance-to-ts-test]
+               (for [instance instances]
+                 (let [[ts-id test-id] test-testset
+                       log (log/info "IN HERE test-by-id: " test-by-id)
+                       tst (first (get test-by-id test-id))
+                       log (log/info "IN HERE tst: " tst)
+                       [run run-steps] (sf-test-suite->run-def options (get tst 1))
+                       log (log/info "IN HERE run: " run)
+                       log (log/info "IN HERE run-steps: " run-steps)
+                       additional-run-fields (eval-additional-fields run (:additional-run-fields options))
+                       additional-run-fields (merge additional-run-fields (:system-fields additional-run-fields))
+                       run (sf-test-run->run-def additional-run-fields (get tst 1))]
+                   {:instance-id (:id instance)
+                    :attributes  run
+                    :steps       run-steps}))))))
 
 (defn find-sf-testset [client [project-id display-action-logs] options testset-name]
   (let [testset (ll-find-testset client [project-id display-action-logs] testset-name)]
@@ -503,11 +518,13 @@
 
 (defn create-testsets [client {:keys [project-id display-action-logs] :as options} xml]
   (doall
-   (for [sf-test-suites xml]
-     (let [testset-name (or (:name (:attrs sf-test-suites) (:name sf-test-suites)))
-           testset      (or (find-sf-testset client [project-id display-action-logs] options testset-name)
-                            (create-sf-testset client options (:test-cases sf-test-suites) testset-name))]
-       {(:id testset) (:test-list sf-test-suites)}))))
+    (for [sf-test-suites xml]
+      (let [testset-name (or (:name (:attrs sf-test-suites) (:name sf-test-suites)))
+            testset (or (find-sf-testset client [project-id display-action-logs] options testset-name)
+                        (create-sf-testset client options (:test-cases sf-test-suites) testset-name))
+            ;log (log/info "IN HERE sf-test-suites: " sf-test-suites)
+            ]
+        {(:id testset) (:test-list sf-test-suites)}))))
 
 (defn group-tests [testsets client options]
   (let [ts-id-test-name-num-instances (into {} (map (fn [[k v]]
@@ -515,27 +532,111 @@
                                                        (frequencies (map (fn [test] (sf-test-suite->pt-test-name options test)) v))})
                                                     (into {} testsets)))
         testset-id-to-name (map (fn [[k v]]
-                                    {k (set (map
-                                             (fn [test] (sf-test-suite->pt-test-name options test)) v))})
-                                  (into {} testsets))
-        tests                (flatten (map val (into {} testsets)))
-        all-tests            (doall (into {} (for [test tests]
-                                               {(sf-test-suite->pt-test-name options test) test})))]
+                                  {k (set (map
+                                            (fn [test] (sf-test-suite->pt-test-name options test)) v))})
+                                (into {} testsets))
+        tests (flatten (map val (into {} testsets)))
+        all-tests (doall (into {} (for [test tests]
+                                    {(sf-test-suite->pt-test-name options test) test})))]
     [all-tests testset-id-to-name ts-id-test-name-num-instances]))
 
-(defn create-or-update-tests [[all-tests testset-id-to-name ts-id-test-name-num-instances] client {:keys [project-id display-action-logs display-run-time] :as options} start-time]
-  (let [new-tests  (into [] (group-test-names (vals all-tests) options))
-        results    (doall
-                    (flatten
-                     (into []
-                           (pmap
+(defn value-get [existing-cases xml-cases]
+  (conj (into [] existing-cases) (into [] xml-cases)))
+
+;(conj (get (:id (last t)) test-cases))
+(defn update-steps [use-test-step old-tests test-cases]
+  (if use-test-step
+    (map
+      (fn [t]
+        (let [test-id (Integer/parseInt (:id (last t)))]
+          (assoc-in t
+                    [1 :test-cases]
+                    (map first
+                         (map val
+                              (merge-with into
+                                          (group-by :pt-test-step-name (:test-cases (second t)))
+                                          (group-by :pt-test-step-name (get test-cases test-id)))))))) old-tests)
+    old-tests))
+
+(defn translate-step-attributes [attributes]
+  {:pt-test-step-name (str "ABC: " (:name attributes))})
+
+(defn create-or-update-tests [[all-tests testset-id-to-name ts-id-test-name-num-instances] client {:keys [project-id display-action-logs display-run-time use-test-step] :as options} start-time]
+  (let [new-tests (into [] (group-test-names (vals all-tests) options))
+        results (doall
+                  (flatten
+                    (into []
+                          (pmap
                             (fn [new-tests-part]
-                              (ll-find-tests client [project-id display-action-logs] new-tests-part)) (partition-all 20 (shuffle new-tests))))))
-        tests (doall (for [res results]
-                       [(:name_exact (:query res)) (get all-tests (:name_exact (:query res))) (first (:data (:tests res)))]))
-        log       (if display-run-time (print-run-time "Time - after find all tests: %d:%d:%d" start-time) nil)
-        nil-tests (filter #(nil? (last %)) tests)
-        old-tests (filter #(not (nil? (last %))) tests)
+                              (ll-find-tests client [project-id display-action-logs] new-tests-part)) (partition-all 20 new-tests)))))
+        log (log/info "IN HERE all-tests: " (pformat all-tests))
+        log (log/info "IN HERE results: " (pformat results))
+
+        xml-tests (doall (for [res results]
+                           [(:name_exact (:query res)) (get all-tests (:name_exact (:query res))) (first (:data (:tests res)))]))
+
+        log (log/info "IN HERE client: " (pformat client))
+
+        log (log/info "IN HERE project-id: " (pformat project-id))
+
+        log (log/info "IN HERE xml-tests: " (pformat xml-tests))
+
+        test-id-by-type (->> results
+                             (map #(get-in % [:tests :data]))
+                             (flatten)
+                             (group-by #(:test-type (:attributes %))))
+
+        log (log/info "IN HERE test-id-by-type: " (pformat test-id-by-type))
+
+        bdd-test-ids (->> (get test-id-by-type "BDDTest")
+                          (group-by :id)
+                          (map (fn [test] {(Integer/parseInt (first test)) (:scenario (:attributes (first (val test))))})))
+
+        log (log/info "IN HERE bdd-test-ids: " (pformat bdd-test-ids))
+
+        test-ids (->> (dissoc test-id-by-type "BDDTest")
+                      (map val)
+                      (first)
+                      (map :id)
+                      (map #(Integer/parseInt %)))
+
+        log (log/info "IN HERE test-ids: " (pformat test-ids))
+
+        test-cases (->> test-ids
+                        (partition-all 20)
+                        (pmap
+                          (fn [test-ids]
+                            (ll-test-steps client project-id (string/join "," test-ids))))
+                        (into [])
+                        (flatten))
+
+        test-id-to-cases (into {}
+                               (map (fn [[grp-key values]]
+                                      {grp-key (map #(translate-step-attributes (:attributes %)) values)})
+                                    (group-by (fn [x] (:test-id (:attributes x))) test-cases)))
+
+        ;log (log/info "IN HERE test-cases: " (pformat test-cases))
+
+        log (log/info "AFTER IN HERE results: " (pformat results))
+
+        log (log/info "IN HERE new-tests: " (pformat new-tests))
+
+        log (log/info "IN HERE use-test-step: " (pformat use-test-step))
+
+
+        log (log/info "IN HERE xml-tests: " (pformat xml-tests))
+        log (if display-run-time (print-run-time "Time - after find all tests: %d:%d:%d" start-time) nil)
+        nil-tests (filter #(nil? (last %)) xml-tests)
+        old-tests (filter #(not (nil? (last %))) xml-tests)
+
+        tests-with-steps (update-steps use-test-step old-tests test-id-to-cases)
+        log (log/info "IN HERE test-cases: " (pformat test-cases))
+
+        log (log/info "IN HERE test-id-to-cases: " (pformat test-id-to-cases))
+
+        log (log/info "IN HERE old-tests: " (pformat old-tests))
+
+        log (log/info "IN HERE tests-with-steps: " (pformat tests-with-steps))
 
         tests-after (if (seq nil-tests)
                       ;; create missing tests and add them to the testset
@@ -544,29 +645,31 @@
                                             nil-tests)]
                         new-tests)
                       ())
-        log       (if display-run-time (print-run-time "Time - after create instances: %d:%d:%d" start-time) nil)
-        new-all-tests (concat tests-after old-tests)]
-    (when (seq old-tests)
+        log (if display-run-time (print-run-time "Time - after create instances: %d:%d:%d" start-time) nil)
+        new-all-tests (concat tests-after tests-with-steps)
+        log (log/info "IN HERE new-all-tests: " (pformat new-all-tests))]
+    (when (seq tests-with-steps)
       ;; update existing tests with new values
       (do
         (doall (map (fn [[_ test-suite test]]
                       (when (test-need-update? test-suite test)
                         (update-sf-test client options test-suite (read-string (:id test)))))
-                    old-tests))
+                    tests-with-steps))
         (when display-run-time (print-run-time "Time - after update tests: %d:%d:%d" start-time))))
     [new-all-tests testset-id-to-name ts-id-test-name-num-instances]))
 
 (defn create-instances [[all-tests testset-id-to-name ts-id-test-name-num-instances] client {:keys [project-id display-action-logs display-run-time] :as options} start-time]
-  (let [all-test-ids       (map (fn [test] (:id (last test))) all-tests)
-        testname-test      (into {} (map (fn [test] {(first test) test}) all-tests))
-        testset-ids        (map (fn [testset] (first (first testset))) testset-id-to-name)
-        ts-ids             (string/join "," testset-ids)
-        instances          (mapcat (fn [test-ids-bucket]
-                                     (ll-testset-instances client
-                                                           [project-id display-action-logs]
-                                                           ts-ids
-                                                           (string/join "," test-ids-bucket)))
-                                   (partition-all max-test-ids-bucket-size all-test-ids))
+  (let [all-test-ids (map (fn [test] (:id (last test))) all-tests)
+        testname-test (into {} (map (fn [test] {(first test) test}) all-tests))
+        testset-ids (map (fn [testset] (first (first testset))) testset-id-to-name)
+        ts-ids (string/join "," testset-ids)
+        instances (mapcat (fn [test-ids-bucket]
+                            (ll-testset-instances client
+                                                  [project-id display-action-logs]
+                                                  ts-ids
+                                                  (string/join "," test-ids-bucket)))
+                          (partition-all max-test-ids-bucket-size all-test-ids))
+        ;log (log/info "IN HERE instances: " {:instances instances})
         ts-id-instance-num (into {} (map (fn [testset-id-name]
                                            {(first (first testset-id-name))
                                             (into {} (map (fn [test-name]
@@ -574,19 +677,23 @@
                                                              (get (get ts-id-test-name-num-instances (first (first testset-id-name))) test-name)})
                                                           (last (last testset-id-name))))})
                                          testset-id-to-name))
-        ts-id-instances    (group-by (fn [inst] (get-in inst [:attributes :set-id])) instances)
+        ;log (log/info "IN HERE ts-id-instance-num: " {:ts-id-instance-num ts-id-instance-num})
+        ts-id-instances (group-by (fn [inst] (get-in inst [:attributes :set-id])) instances)
 
-        missing-tests       (into {}
-                                  (doall
-                                    (for [ts-id (into () testset-ids)]
-                                      {ts-id (merge-with -
-                                                         (get ts-id-instance-num ts-id)
-                                                         (frequencies (vec (map #(get-in % [:attributes :test-id]) (get ts-id-instances (read-string ts-id))))))})))
-        make-instances      (flatten (make-instances missing-tests))
-        test-by-id          (group-by (fn [test] (read-string (:id (last test)))) all-tests)
-        new-intstances      (flatten (for [instances-part (partition-all 100 (shuffle make-instances))]
-                                       (ll-create-instances client [project-id display-action-logs] instances-part)))
-        all-intstances      (into [] (concat new-intstances instances))
-        instance-to-ts-test (group-by (fn [inst] [(:set-id (:attributes inst)) (:test-id (:attributes inst))]) all-intstances)]
-      (when display-run-time (print-run-time "Time - after create instances: %d:%d:%d" start-time))
-      [test-by-id instance-to-ts-test]))
+        missing-tests (into {}
+                            (doall
+                              (for [ts-id (into () testset-ids)]
+                                {ts-id (merge-with -
+                                                   (get ts-id-instance-num ts-id)
+                                                   (frequencies (vec (map #(get-in % [:attributes :test-id]) (get ts-id-instances (read-string ts-id))))))})))
+        make-instances (flatten (make-instances missing-tests))
+        log (log/info "IN HERE make-instances: " (pformat make-instances))
+        test-by-id (group-by (fn [test] (read-string (:id (last test)))) all-tests)
+        new-intstances (flatten (for [instances-part (partition-all 100 (shuffle make-instances))]
+                                  (ll-create-instances client [project-id display-action-logs] instances-part)))
+        log (log/info "IN HERE new-intstances: " (pformat new-intstances))
+        all-intstances (into [] (concat new-intstances instances))
+        instance-to-ts-test (group-by (fn [inst] [(:set-id (:attributes inst)) (:test-id (:attributes inst))]) all-intstances)
+        log (log/info "IN HERE instance-to-ts-test: " (pformat instance-to-ts-test))]
+    (when display-run-time (print-run-time "Time - after create instances: %d:%d:%d" start-time))
+    [test-by-id instance-to-ts-test]))
