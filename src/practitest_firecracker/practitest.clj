@@ -9,13 +9,7 @@
     [practitest-firecracker.query-dsl :refer [query? eval-query]]
     [throttler.core :refer [fn-throttler]]
     [practitest-firecracker.utils :refer [parse-id print-run-time test-need-update? exit group-errors]]
-    [clojure.pprint :as pprint]
-    [lambdaisland.cucumber.dsl :refer :all]
-    )
-  ;(:import [lein-cucumber.Parser]
-  ;         [lein-cucumber.ast.Feature]
-  ;         [lein-cucumber.pickles.Pickle])
-  )
+    [clojure.pprint :as pprint]))
 
 ;; ===========================================================================
 ;; api version
@@ -413,7 +407,7 @@
                              additional-test-fields)
                       step-defs))))
 
-(defn update-sf-test [client {:keys [project-id display-action-logs] :as options} sf-test-suite test-id]
+(defn update-sf-test [client {:keys [project-id display-action-logs] :as options} sf-test-suite test]
   (let [[test-def step-defs] (sf-test-suite->test-def options sf-test-suite)
         additional-test-fields (eval-additional-fields sf-test-suite (:additional-test-fields options))
         additional-test-fields (merge additional-test-fields (:system-fields additional-test-fields))]
@@ -421,10 +415,11 @@
     (ll-update-test client
                     [project-id display-action-logs]
                     (merge test-def
-                           {:author-id (:author-id options)}
+                           {:author-id (:author-id options)
+                            :test-type (:test-type (:attributes test))}
                            additional-test-fields)
                     step-defs
-                    test-id)))
+                    (read-string (:id test)))))
 
 (defn update-sf-testset [client {:keys [project-id display-action-logs] :as options} testset-name sf-test-suite testset-id]
   (let [[test-def step-defs] (sf-test-suite->test-def options sf-test-suite)
@@ -559,7 +554,7 @@
     old-tests))
 
 (defn translate-step-attributes [attributes]
-  {:pt-test-step-name (str "ABC: " (:name attributes))})
+  {:pt-test-step-name (:name attributes)})
 
 (defn create-or-update-tests [[all-tests testset-id-to-name ts-id-test-name-num-instances] client {:keys [project-id display-action-logs display-run-time use-test-step] :as options} start-time]
   (let [new-tests (into [] (group-test-names (vals all-tests) options))
@@ -569,38 +564,24 @@
                           (pmap
                             (fn [new-tests-part]
                               (ll-find-tests client [project-id display-action-logs] new-tests-part)) (partition-all 20 new-tests)))))
-        log (log/info "IN HERE all-tests: " (pformat all-tests))
-        log (log/info "IN HERE results: " (pformat results))
 
         xml-tests (doall (for [res results]
                            [(:name_exact (:query res)) (get all-tests (:name_exact (:query res))) (first (:data (:tests res)))]))
-
-        log (log/info "IN HERE client: " (pformat client))
-
-        log (log/info "IN HERE project-id: " (pformat project-id))
-
-        log (log/info "IN HERE xml-tests: " (pformat xml-tests))
 
         test-id-by-type (->> results
                              (map #(get-in % [:tests :data]))
                              (flatten)
                              (group-by #(:test-type (:attributes %))))
 
-        log (log/info "IN HERE test-id-by-type: " (pformat test-id-by-type))
-
         bdd-test-ids (->> (get test-id-by-type "BDDTest")
                           (group-by :id)
                           (map (fn [test] {(Integer/parseInt (first test)) (:scenario (:attributes (first (val test))))})))
-
-        log (log/info "IN HERE bdd-test-ids: " (pformat bdd-test-ids))
 
         test-ids (->> (dissoc test-id-by-type "BDDTest")
                       (map val)
                       (first)
                       (map :id)
                       (map #(Integer/parseInt %)))
-
-        log (log/info "IN HERE test-ids: " (pformat test-ids))
 
         test-cases (->> test-ids
                         (partition-all 20)
@@ -615,29 +596,11 @@
                                       {grp-key (map #(translate-step-attributes (:attributes %)) values)})
                                     (group-by (fn [x] (:test-id (:attributes x))) test-cases)))
 
-        ;log (log/info "IN HERE test-cases: " (pformat test-cases))
-
-        log (log/info "AFTER IN HERE results: " (pformat results))
-
-        log (log/info "IN HERE new-tests: " (pformat new-tests))
-
-        log (log/info "IN HERE use-test-step: " (pformat use-test-step))
-
-
-        log (log/info "IN HERE xml-tests: " (pformat xml-tests))
         log (if display-run-time (print-run-time "Time - after find all tests: %d:%d:%d" start-time) nil)
         nil-tests (filter #(nil? (last %)) xml-tests)
         old-tests (filter #(not (nil? (last %))) xml-tests)
 
         tests-with-steps (update-steps use-test-step old-tests test-id-to-cases)
-        log (log/info "IN HERE test-cases: " (pformat test-cases))
-
-        log (log/info "IN HERE test-id-to-cases: " (pformat test-id-to-cases))
-
-        log (log/info "IN HERE old-tests: " (pformat old-tests))
-
-        log (log/info "IN HERE tests-with-steps: " (pformat tests-with-steps))
-
         tests-after (if (seq nil-tests)
                       ;; create missing tests and add them to the testset
                       (let [new-tests (pmap (fn [[test-name test-suite _]]
@@ -646,14 +609,13 @@
                         new-tests)
                       ())
         log (if display-run-time (print-run-time "Time - after create instances: %d:%d:%d" start-time) nil)
-        new-all-tests (concat tests-after tests-with-steps)
-        log (log/info "IN HERE new-all-tests: " (pformat new-all-tests))]
+        new-all-tests (concat tests-after tests-with-steps)]
     (when (seq tests-with-steps)
       ;; update existing tests with new values
       (do
         (doall (map (fn [[_ test-suite test]]
                       (when (test-need-update? test-suite test)
-                        (update-sf-test client options test-suite (read-string (:id test)))))
+                        (update-sf-test client options test-suite test)))
                     tests-with-steps))
         (when display-run-time (print-run-time "Time - after update tests: %d:%d:%d" start-time))))
     [new-all-tests testset-id-to-name ts-id-test-name-num-instances]))

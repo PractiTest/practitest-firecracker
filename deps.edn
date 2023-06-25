@@ -7,11 +7,7 @@
          throttler/throttler            {:mvn/version "1.0.0"}
          org.clojure/tools.logging      {:mvn/version "1.1.0"}
          ch.qos.logback/logback-classic {:mvn/version "1.2.3"}
-         clj-time/clj-time              {:mvn/version "0.15.2"}
-         lambdaisland/kaocha-cucumber   {:mvn/version "0.11.100"}
-         com.siili/lein-cucumber        {:mvn/version "1.0.7"}
-         ;com.github.cucumber/cucumber-clojure {:mvn/version "7.0.0"}
-         }
+         clj-time/clj-time              {:mvn/version "0.15.2"}}
 
  :aliases
  {:dev       {:extra-paths ["dev"]}
