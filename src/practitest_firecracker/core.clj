@@ -1,19 +1,19 @@
 (ns practitest-firecracker.core
   (:require
    [practitest-firecracker.cli         :refer [parse-args]]
-   [practitest-firecracker.practitest  :refer [make-client
-                                               make-runs
+   [practitest-firecracker.practitest  :refer [make-runs
                                                create-testsets
                                                group-tests
                                                create-or-update-tests
                                                create-instances
-                                               create-runs
-                                               fc-version]]
+                                               create-runs]]
    [practitest-firecracker.parser.core :refer [send-directory parse-files]]
+   [practitest-firecracker.api         :refer [make-client]]
    [practitest-firecracker.utils       :refer [exit]]
    [clojure.pprint                     :as     pprint]
    [clojure.java.io                    :as     io]
-   [clj-time.core                      :as     t])
+   [clj-time.core                      :as     t]
+   [practitest-firecracker.const       :refer [fc-version]])
   (:gen-class))
 
 (defmacro timef
@@ -57,6 +57,5 @@
                    (create-or-update-tests client options start-time)
                    (create-instances client options start-time)
                    (make-runs client options start-time)
-                   (create-runs client options start-time)
-                   ))
+                   (create-runs client options start-time)))
               (exit 0 (format "Done"))))))))
