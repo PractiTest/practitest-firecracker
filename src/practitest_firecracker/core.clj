@@ -50,6 +50,7 @@
 
             "create-and-populate-testset"
             (do
+              (println "Start Running Firecracker, Version: " fc-version)
               (timef
                "create-and-populate-testset"
                (-> (create-testsets client options additional-reports)
