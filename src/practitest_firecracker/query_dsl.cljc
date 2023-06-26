@@ -78,7 +78,7 @@
                              (string/split (second args) complied))
                            (return-error "Syntax error: 'split' must have two arguments" query))
     'get               (if (= 2 (count args))
-                         (take 1 (drop (- (parse-int (first args)) 1) (last args)))
+                         (first (take 1 (drop (- (parse-int (first args)) 1) (last args))))
                          (return-error "Syntax error: 'get' must have two arguments" query))
     'trim               (if (= 1 (count args))
                           (if (string? (first args))
