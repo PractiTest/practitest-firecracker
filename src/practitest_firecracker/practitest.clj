@@ -129,7 +129,8 @@
 (defn create-instances [[all-tests testset-id-to-name ts-id-test-name-num-instances] client {:keys [project-id display-action-logs display-run-time pt-instance-params] :as options} start-time]
   (let [all-test-ids (map (fn [test] (:id (last test))) all-tests)
         testname-test (into {} (map (fn [test] {(first test) test}) all-tests))
-        testid-params (into {}
+        testid-params (when pt-instance-params
+                        (into {}
                               (map
                                 (fn [test]
                                   (let [split-params (string/split
@@ -140,12 +141,12 @@
                                     {(Integer/parseInt (:id (last test)))
                                      (when (= (mod (count split-params) 2) 0)
                                        (apply array-map
-                                            (string/split
-                                              (eval-query
-                                                (second test)
-                                                (read-query pt-instance-params))
-                                              #"\|")))}))
-                                all-tests))
+                                              (string/split
+                                                (eval-query
+                                                  (second test)
+                                                  (read-query pt-instance-params))
+                                                #"\|")))}))
+                                all-tests)))
         testset-ids (map (fn [testset] (first (first testset))) testset-id-to-name)
         ts-ids (string/join "," testset-ids)
         instances (mapcat (fn [test-ids-bucket]
@@ -154,19 +155,21 @@
                                                       ts-ids
                                                       (string/join "," test-ids-bucket)))
                           (partition-all max-test-ids-bucket-size all-test-ids))
-        filter-instances (filter
-                           (fn [instance]
-                             (let
-                               [{:keys [name bdd-parameters parameters]} (:attributes instance)
-                                [_ xml-test test] (get testname-test name)
-                                split-params (string/split
-                                               (eval-query xml-test (read-query pt-instance-params)) #"\|")
-                                xml-params (into {} (map (fn [[key value]] {(keyword key) value})
-                                                         (when (= (mod (count split-params) 2) 0)
-                                                           (apply array-map split-params))))
-                                test-type (:test-type (:attributes test))
-                                params (if (= test-type "BDDTest") bdd-parameters parameters)]
-                               (= xml-params params)))
+        filter-instances (if pt-instance-params
+                           (filter
+                             (fn [instance]
+                               (let
+                                 [{:keys [name bdd-parameters parameters]} (:attributes instance)
+                                  [_ xml-test test] (get testname-test name)
+                                  split-params (string/split
+                                                 (eval-query xml-test (read-query pt-instance-params)) #"\|")
+                                  xml-params (into {} (map (fn [[key value]] {(keyword key) value})
+                                                           (when (= (mod (count split-params) 2) 0)
+                                                             (apply array-map split-params))))
+                                  test-type (:test-type (:attributes test))
+                                  params (if (= test-type "BDDTest") bdd-parameters parameters)]
+                                 (= xml-params params)))
+                             instances)
                            instances)
 
         ts-id-instance-num (into {} (map (fn [testset-id-name]
