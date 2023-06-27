@@ -101,7 +101,6 @@
                        (map :id tests))))
 
 (defn sf-test-case->run-step-def [options test-case]
-  (log/info "IN HERE sf-test-case->run-step-def test-case: " (pformat test-case))
   {:name           (sf-test-case->pt-step-name options test-case)
    :actual-results (str (:failure-message test-case) \newline (:failure-detail test-case))
    :status         (case (:failure-type test-case)
@@ -114,8 +113,6 @@
    :description    (:description test-case)})
 
 (defn sf-test-suite->run-def [options test-suite]
-  (log/info "IN HERE sf-test-suite->run-def")
-  (log/info "IN HERE (:test-cases test-suite): " (pformat (:test-cases test-suite)))
   [{:run-duration (:time-elapsed test-suite)}
    (map (partial sf-test-case->run-step-def options) (:test-cases test-suite))])
 

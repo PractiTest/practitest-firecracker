@@ -3,7 +3,6 @@
     [clj-http.client :as http]
     [clojure.string :as string]
     [throttler.core :refer [fn-throttler]]
-    [clojure.pprint :as pprint]
     [clojure.tools.logging :as log]
     [practitest-firecracker.const :refer :all]
     [practitest-firecracker.utils :refer [exit group-errors pformat]]))
@@ -89,16 +88,13 @@
                                      test-ids (assoc :test-ids test-ids))})))
 
 (defn ll-test-steps [{:keys [base-uri credentials max-api-rate-throttler]} project-id test-id]
-  (log/info "ll-test-steps %s" (pformat test-id))
   (let [uri (build-uri base-uri test-steps-uri project-id)]
-    (log/info "IN HERE uri:" (pformat uri))
     (api-call {:credentials  credentials
                :uri          uri
                :method       (max-api-rate-throttler http/get)
                :query-params {:test-ids test-id}})))
 
 (defn ll-create-test [{:keys [base-uri credentials max-api-rate-throttler]} project-id attributes steps]
-  ;; (log/infof "create test %s" (:name attributes))
   (let [uri (build-uri base-uri create-test-uri project-id)]
     (first
       (api-call {:credentials credentials
@@ -109,7 +105,6 @@
                                       :steps      {:data steps}}}}))))
 
 (defn ll-create-testset [{:keys [base-uri credentials max-api-rate-throttler]} project-id attributes test-ids]
-  ;; (log/infof "create testset %s" (:name attributes))
   (let [uri (build-uri base-uri create-testset-uri project-id)]
     (first
       (api-call {:credentials credentials
@@ -119,17 +114,14 @@
                                       :attributes attributes
                                       :instances  {:test-ids test-ids}}}}))))
 
-(defn make-instances [testset-tests pt-instance-params]
+(defn make-instances [testset-tests testid-params]
   (for [[testset-id test-ids-num] testset-tests
         test-id-num test-ids-num
         index (range (last test-id-num))]
-    (do
-      (log/info "IN HERE pt-instance-params: " (pformat pt-instance-params))
-      (log/info "IN HERE test-ids-num: " (pformat test-ids-num))
-      {:type       "instances"
-       :attributes {:set-id     testset-id
-                    :test-id    (first test-id-num)
-                    :parameters {:var "Val"}}})))
+    {:type       "instances"
+     :attributes {:set-id     testset-id
+                  :test-id    (first test-id-num)
+                  :parameters (get testid-params (first test-id-num))}}))
 
 (defn has-duplicates? [key runs]
   (let [grouped (group-by key (into [] runs))]
@@ -137,8 +129,6 @@
 
 (defn ll-create-instances [{:keys [base-uri credentials max-api-rate-throttler]} [project-id display-action-logs] instances]
   (when display-action-logs (log/infof "create instances"))
-
-  (log/info "IN HERE ll-create-instances instances: " (pformat instances))
   (let [uri (build-uri base-uri create-instance-uri project-id)]
     (api-call {:credentials credentials
                :uri         uri

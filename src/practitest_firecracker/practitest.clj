@@ -5,6 +5,8 @@
     [practitest-firecracker.utils :refer [print-run-time test-need-update? pformat]]
     [practitest-firecracker.api :as api]
     [practitest-firecracker.const :refer [max-test-ids-bucket-size]]
+    [practitest-firecracker.query-dsl :refer [query? eval-query]]
+    [practitest-firecracker.query-dsl :refer [read-query]]
     [practitest-firecracker.eval :as eval]))
 
 (defn find-sf-testset [client [project-id display-action-logs] options testset-name]
@@ -18,12 +20,8 @@
              (for [[test-testset instances] instance-to-ts-test]
                (for [instance instances]
                  (let [[ts-id test-id] test-testset
-                       log (log/info "IN HERE test-by-id: " (pformat test-by-id))
                        tst (first (get test-by-id test-id))
-                       log (log/info "IN HERE tst: " (pformat tst))
                        [run run-steps] (eval/sf-test-suite->run-def options (get tst 1))
-                       log (log/info "IN HERE run: " (pformat run))
-                       log (log/info "IN HERE run-steps: " (pformat run-steps))
                        additional-run-fields (eval/eval-additional-fields run (:additional-run-fields options))
                        additional-run-fields (merge additional-run-fields (:system-fields additional-run-fields))
                        run (eval/sf-test-run->run-def additional-run-fields (get tst 1))]
@@ -39,7 +37,7 @@
                         (eval/create-sf-testset client options (:test-cases sf-test-suites) testset-name))]
         {(:id testset) (:test-list sf-test-suites)}))))
 
-(defn group-tests [testsets client options]
+(defn group-tests [testsets _ options]
   (let [ts-id-test-name-num-instances (into {} (map (fn [[k v]]
                                                       {k
                                                        (frequencies (map (fn [test] (eval/sf-test-suite->pt-test-name options test)) v))})
@@ -121,19 +119,33 @@
         new-all-tests (concat tests-after tests-with-steps)]
     (when (seq tests-with-steps)
       ;; update existing tests with new values
-      (do
-        (doall (map (fn [[_ test-suite test]]
-                      (when (test-need-update? test-suite test)
-                        (eval/update-sf-test client options test-suite test)))
-                    tests-with-steps))
-        (when display-run-time (print-run-time "Time - after update tests: %d:%d:%d" start-time))))
+      (doall (map (fn [[_ test-suite test]]
+                    (when (test-need-update? test-suite test)
+                      (eval/update-sf-test client options test-suite test)))
+                  tests-with-steps))
+      (when display-run-time (print-run-time "Time - after update tests: %d:%d:%d" start-time)))
     [new-all-tests testset-id-to-name ts-id-test-name-num-instances]))
 
 (defn create-instances [[all-tests testset-id-to-name ts-id-test-name-num-instances] client {:keys [project-id display-action-logs display-run-time pt-instance-params] :as options} start-time]
-  (let [
-        log (log/info "IN HERE pt-instance-params: " (pformat pt-instance-params))
-        all-test-ids (map (fn [test] (:id (last test))) all-tests)
+  (let [all-test-ids (map (fn [test] (:id (last test))) all-tests)
         testname-test (into {} (map (fn [test] {(first test) test}) all-tests))
+        testid-params (into {}
+                              (map
+                                (fn [test]
+                                  (let [split-params (string/split
+                                                       (eval-query
+                                                         (second test)
+                                                         (read-query pt-instance-params))
+                                                       #"\|")]
+                                    {(Integer/parseInt (:id (last test)))
+                                     (when (= (mod (count split-params) 2) 0)
+                                       (apply array-map
+                                            (string/split
+                                              (eval-query
+                                                (second test)
+                                                (read-query pt-instance-params))
+                                              #"\|")))}))
+                                all-tests))
         testset-ids (map (fn [testset] (first (first testset))) testset-id-to-name)
         ts-ids (string/join "," testset-ids)
         instances (mapcat (fn [test-ids-bucket]
@@ -142,34 +154,43 @@
                                                       ts-ids
                                                       (string/join "," test-ids-bucket)))
                           (partition-all max-test-ids-bucket-size all-test-ids))
+        filter-instances (filter
+                           (fn [instance]
+                             (let
+                               [{:keys [name bdd-parameters parameters]} (:attributes instance)
+                                [_ xml-test test] (get testname-test name)
+                                split-params (string/split
+                                               (eval-query xml-test (read-query pt-instance-params)) #"\|")
+                                xml-params (into {} (map (fn [[key value]] {(keyword key) value})
+                                                         (when (= (mod (count split-params) 2) 0)
+                                                           (apply array-map split-params))))
+                                test-type (:test-type (:attributes test))
+                                params (if (= test-type "BDDTest") bdd-parameters parameters)]
+                               (= xml-params params)))
+                           instances)
 
-        log (log/info "IN HERE all-tests: " (pformat all-tests))
-        log (log/info "IN HERE instances: " (pformat instances))
         ts-id-instance-num (into {} (map (fn [testset-id-name]
                                            {(first (first testset-id-name))
-                                            (into {} (map (fn [test-name]
-                                                            {(read-string (:id (last (get testname-test test-name))))
-                                                             (get (get ts-id-test-name-num-instances (first (first testset-id-name))) test-name)})
-                                                          (last (last testset-id-name))))})
+                                            (into {}
+                                                  (map
+                                                    (fn [test-name]
+                                                      {(read-string (:id (last (get testname-test test-name))))
+                                                       (get (get ts-id-test-name-num-instances (first (first testset-id-name))) test-name)})
+                                                    (last (last testset-id-name))))})
                                          testset-id-to-name))
-        ts-id-instances (group-by (fn [inst] (get-in inst [:attributes :set-id])) instances)
-
-        missing-tests (into {}
-                            (doall
-                              (for [ts-id (into () testset-ids)]
-                                {ts-id (merge-with -
-                                                   (get ts-id-instance-num ts-id)
-                                                   (frequencies (vec (map #(get-in % [:attributes :test-id]) (get ts-id-instances (read-string ts-id))))))})))
-        log (log/info "IN HERE missing-tests: " (pformat missing-tests))
-        make-instances (flatten (api/make-instances missing-tests pt-instance-params))
-        log (log/info "IN HERE make-instances: " (pformat make-instances))
+        ts-id-instances (group-by (fn [inst] (get-in inst [:attributes :set-id])) filter-instances)
+        missing-instances (into {}
+                                (doall
+                                  (for [ts-id (into () testset-ids)]
+                                    {ts-id (merge-with -
+                                                       (get ts-id-instance-num ts-id)
+                                                       (frequencies (vec (map #(get-in % [:attributes :test-id]) (get ts-id-instances (read-string ts-id))))))})))
+        make-instances (flatten (api/make-instances missing-instances testid-params))
         test-by-id (group-by (fn [test] (read-string (:id (last test)))) all-tests)
         new-intstances (flatten (for [instances-part (partition-all 100 (shuffle make-instances))]
                                   (api/ll-create-instances client [project-id display-action-logs] instances-part)))
-        log (log/info "IN HERE new-intstances: " (pformat new-intstances))
         all-intstances (into [] (concat new-intstances instances))
-        instance-to-ts-test (group-by (fn [inst] [(:set-id (:attributes inst)) (:test-id (:attributes inst))]) all-intstances)
-        log (log/info "IN HERE instance-to-ts-test: " (pformat instance-to-ts-test))]
+        instance-to-ts-test (group-by (fn [inst] [(:set-id (:attributes inst)) (:test-id (:attributes inst))]) all-intstances)]
     (when display-run-time (print-run-time "Time - after create instances: %d:%d:%d" start-time))
     [test-by-id instance-to-ts-test]))
 
