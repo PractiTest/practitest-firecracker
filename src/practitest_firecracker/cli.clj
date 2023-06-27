@@ -1,11 +1,12 @@
 (ns practitest-firecracker.cli
   (:require
-   [clojure.tools.cli                :as cli]
-   [clojure.java.io                  :refer [file reader]]
-   [clojure.walk                     :refer [postwalk]]
-   [clojure.string                   :as string]
-   [cheshire.core                    :as json]
-   [practitest-firecracker.query-dsl :refer [read-query]]))
+    [clojure.tools.cli :as cli]
+    [clojure.java.io :refer [file reader]]
+    [clojure.tools.logging :as log]
+    [clojure.walk :refer [postwalk]]
+    [clojure.string :as string]
+    [cheshire.core :as json]
+    [practitest-firecracker.query-dsl :refer [read-query]]))
 
 (defn parse-additional-fields [v]
   (postwalk #(if (string? %) (read-query %) %)

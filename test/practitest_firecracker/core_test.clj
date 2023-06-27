@@ -2,6 +2,10 @@
   (:require [clojure.test :refer :all]
             [practitest-firecracker.core :refer :all]))
 
-(deftest a-test
-  (testing "FIXME, I fail."
-    (is (= 0 1))))
+(deftest test--main
+  (testing "test -main"
+    (=
+      (-main
+        {:name        "step name"
+         :description "step description"})
+      "")))
