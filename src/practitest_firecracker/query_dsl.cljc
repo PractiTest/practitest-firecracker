@@ -117,16 +117,12 @@
                        {:op   (compile-query op)
                         :args (vec (map compile-query args))})
                      query))]
-    #?(:cljs (if (and (not (number? query)) (not (string? query)))
+    (if (not (or (number? query)
+                 (string? query)
+                 (double? query)))
                (with-meta (compiler query)
                           {:query true})
-               (compiler query))
-       :clj  (if (not (or (= java.lang.Long (type query))
-                          (= java.lang.Double (type query))
-                          (and (= java.lang.String (type query)))))
-               (with-meta (compiler query)
-                          {:query true})
-               (compiler query)))))
+               (compiler query))))
 
 (defn try-read-query [s]
   #?(:cljs

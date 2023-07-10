@@ -13,6 +13,7 @@
    [clojure.pprint                     :as     pprint]
    [clojure.java.io                    :as     io]
    [clj-time.core                      :as     t]
+   [clojure.tools.logging              :as log]
    [practitest-firecracker.const       :refer [fc-version]])
   (:gen-class))
 
@@ -46,11 +47,11 @@
               (pprint/pprint {"=============== args: ===============" args}))
 
             "version"
-            (println "Version: " fc-version)
+            (log/info "Version: " fc-version)
 
             "create-and-populate-testset"
             (do
-              (println "Start Running Firecracker, Version: " fc-version)
+              (log/info "Start Running Firecracker, Version: " fc-version)
               (timef
                "create-and-populate-testset"
                (-> (create-testsets client options additional-reports)

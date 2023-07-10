@@ -41,21 +41,10 @@
                   ;; load balancer freaking out, lets try again
                   (Thread/sleep (* timeout-between-attempts 1000))
                   (recur results uri (dec attempts) params))
-            502 (do
-                  ;; 502 Bad Gateway Error, lets try again
-                  (log/warnf "%s responded with 502 - %s more attempts" uri attempts)
-                  (Thread/sleep (* timeout-between-attempts 1000))
-                  (recur results uri (dec attempts) params))
-            500 (do
-                  ;; 500 Bad Gateway Error, lets try again
-                  (log/warnf "%s responded with 500 - %s more attempts" uri attempts)
-                  (Thread/sleep (* timeout-between-attempts 1000))
-                  (recur results uri (dec attempts) params))
-            503 (do
-                  ;; 503 Service Unavailable, lets try again
-                  (log/warnf "%s responded with 503  - %s more attempts" uri attempts)
-                  (Thread/sleep (* timeout-between-attempts 1000))
-                  (recur results uri (dec attempts) params))
+            (500 502 503) (do
+                            (log/warnf "%s responded with %s - %s more attempts" uri status attempts)
+                            (Thread/sleep (* timeout-between-attempts 1000))
+                            (recur results uri (dec attempts) params))
             429 (do
                   (log/warnf "API rate limit reached, waiting for %s seconds" backoff-timeout)
                   (Thread/sleep (* backoff-timeout 1000))
