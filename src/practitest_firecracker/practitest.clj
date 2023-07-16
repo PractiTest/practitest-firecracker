@@ -155,7 +155,7 @@
                                                       ts-ids
                                                       (string/join "," test-ids-bucket)))
                           (partition-all max-test-ids-bucket-size all-test-ids))
-        filter-instances (if pt-instance-params
+        filter-instances (if (not-empty pt-instance-params)
                            (filter
                              (fn [instance]
                                (let
