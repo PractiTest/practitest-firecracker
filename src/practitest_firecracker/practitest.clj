@@ -129,7 +129,7 @@
 (defn create-instances [[all-tests testset-id-to-name ts-id-test-name-num-instances] client {:keys [project-id display-action-logs display-run-time pt-instance-params] :as options} start-time]
   (let [all-test-ids (map (fn [test] (:id (last test))) all-tests)
         testname-test (into {} (map (fn [test] {(first test) test}) all-tests))
-        testid-params (when pt-instance-params
+        testid-params (when (not-empty pt-instance-params)
                         (into {}
                               (map
                                 (fn [test]
