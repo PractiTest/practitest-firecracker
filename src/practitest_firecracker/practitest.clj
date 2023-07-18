@@ -1,6 +1,7 @@
 (ns practitest-firecracker.practitest
   (:require
     [clojure.string :as string]
+    [clojure.pprint                     :as pprint]
     [clojure.tools.logging :as log]
     [practitest-firecracker.utils :refer [print-run-time test-need-update? pformat]]
     [practitest-firecracker.api :as api]
@@ -126,27 +127,30 @@
       (when display-run-time (print-run-time "Time - after update tests: %d:%d:%d" start-time)))
     [new-all-tests testset-id-to-name ts-id-test-name-num-instances]))
 
+(defn split-n-filter-instance-params [test pt-instance-params]
+  (into []
+        (filter not-empty
+                (string/split
+                  (eval-query
+                    (second test)
+                    (read-query pt-instance-params))
+                  #"\|"))))
+
 (defn create-instances [[all-tests testset-id-to-name ts-id-test-name-num-instances] client {:keys [project-id display-action-logs display-run-time pt-instance-params] :as options} start-time]
+  (when display-action-logs (log/infof "pt-instance-params: %s" pt-instance-params))
   (let [all-test-ids (map (fn [test] (:id (last test))) all-tests)
         testname-test (into {} (map (fn [test] {(first test) test}) all-tests))
         testid-params (when (not-empty pt-instance-params)
                         (into {}
                               (map
                                 (fn [test]
-                                  (let [split-params (string/split
-                                                       (eval-query
-                                                         (second test)
-                                                         (read-query pt-instance-params))
-                                                       #"\|")]
+                                  (let [split-params (split-n-filter-instance-params test pt-instance-params)]
                                     {(Integer/parseInt (:id (last test)))
-                                     (when (= (mod (count split-params) 2) 0)
+                                     (when (even? (count split-params))
                                        (apply array-map
-                                              (string/split
-                                                (eval-query
-                                                  (second test)
-                                                  (read-query pt-instance-params))
-                                                #"\|")))}))
+                                              (split-n-filter-instance-params test pt-instance-params)))}))
                                 all-tests)))
+        log (when display-action-logs (log/infof "testid-params: %s" testid-params))
         testset-ids (map (fn [testset] (first (first testset))) testset-id-to-name)
         ts-ids (string/join "," testset-ids)
         instances (mapcat (fn [test-ids-bucket]
@@ -161,16 +165,16 @@
                                (let
                                  [{:keys [name bdd-parameters parameters]} (:attributes instance)
                                   [_ xml-test test] (get testname-test name)
-                                  split-params (string/split
-                                                 (eval-query xml-test (read-query pt-instance-params)) #"\|")
+                                  split-params (split-n-filter-instance-params test pt-instance-params)
                                   xml-params (into {} (map (fn [[key value]] {(keyword key) value})
-                                                           (when (= (mod (count split-params) 2) 0)
+                                                           (when (even? (count split-params))
                                                              (apply array-map split-params))))
                                   test-type (:test-type (:attributes test))
                                   params (if (= test-type "BDDTest") bdd-parameters parameters)]
                                  (= xml-params params)))
                              instances)
                            instances)
+        log (when display-action-logs (do (log/infof "filter-instances: ") (pprint/pprint filter-instances)))
 
         ts-id-instance-num (into {} (map (fn [testset-id-name]
                                            {(first (first testset-id-name))
