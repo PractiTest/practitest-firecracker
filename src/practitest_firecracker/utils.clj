@@ -12,11 +12,6 @@
         hours      (if (> sec-pass 3600) (t/in-hours (t/interval start-time (t/now))) 0)]
     (pprint/pprint (format text hours minutes secs))))
 
-(defn parse-id [id]
-  (if (string? id)
-    (Long/parseLong id)
-    id))
-
 (defn test-need-update? [test-suite test]
   (let [
         ;; log (pprint/pprint {:test-suite test-suite
@@ -30,3 +25,8 @@
 
 (defn group-errors [body]
   (str "Errors: \n" (string/join "\n" (map #(str "- " %) (map :title (:errors (json/parse-string body true)))))))
+
+(defn pformat [& args]
+  (with-out-str
+    (apply pprint/pprint args)))
+

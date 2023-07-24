@@ -1,19 +1,20 @@
 (ns practitest-firecracker.core
   (:require
    [practitest-firecracker.cli         :refer [parse-args]]
-   [practitest-firecracker.practitest  :refer [make-client
-                                               make-runs
+   [practitest-firecracker.practitest  :refer [make-runs
                                                create-testsets
                                                group-tests
                                                create-or-update-tests
                                                create-instances
-                                               create-runs
-                                               fc-version]]
+                                               create-runs]]
    [practitest-firecracker.parser.core :refer [send-directory parse-files]]
+   [practitest-firecracker.api         :refer [make-client]]
    [practitest-firecracker.utils       :refer [exit]]
    [clojure.pprint                     :as     pprint]
-   [clojure.java.io                    :refer [file]]
-   [clj-time.core                      :as     t])
+   [clojure.java.io                    :as     io]
+   [clj-time.core                      :as     t]
+   [clojure.tools.logging              :as log]
+   [practitest-firecracker.const       :refer [fc-version]])
   (:gen-class))
 
 (defmacro timef
@@ -30,7 +31,7 @@
       (exit (if ok? 0 1) exit-message)
       (let [client             (make-client (select-keys options [:email :api-token :api-uri :max-api-rate]))
             directory          (:reports-path options)
-            dirs               (when-not (nil? directory) (for [dir directory] (clojure.java.io/file dir)))
+            dirs               (when-not (nil? directory) (for [dir directory] (io/file dir)))
             parsed-dirs        (when-not (nil? dirs) (for [dir (file-seq (first dirs))] (parse-files dir)))
             additional-reports (send-directory parsed-dirs (:test-case-as-pt-test-step options) (:multitestset options) (:testset-name options) false)
             start-time         (t/now)]
@@ -46,10 +47,11 @@
               (pprint/pprint {"=============== args: ===============" args}))
 
             "version"
-            (println "Version: " fc-version)
+            (log/info "Version: " fc-version)
 
             "create-and-populate-testset"
             (do
+              (log/info "Start Running Firecracker, Version: " fc-version)
               (timef
                "create-and-populate-testset"
                (-> (create-testsets client options additional-reports)
@@ -57,6 +59,5 @@
                    (create-or-update-tests client options start-time)
                    (create-instances client options start-time)
                    (make-runs client options start-time)
-                   (create-runs client options start-time)
-                   ))
+                   (create-runs client options start-time)))
               (exit 0 (format "Done"))))))))

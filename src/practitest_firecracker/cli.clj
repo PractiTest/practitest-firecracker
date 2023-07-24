@@ -1,11 +1,12 @@
 (ns practitest-firecracker.cli
   (:require
-   [clojure.tools.cli                :refer [parse-opts]]
-   [clojure.java.io                  :refer [file reader]]
-   [clojure.walk                     :refer [postwalk]]
-   [clojure.string                   :as string]
-   [cheshire.core                    :as json]
-   [practitest-firecracker.query-dsl :refer [read-query]]))
+    [clojure.tools.cli :as cli]
+    [clojure.java.io :refer [file reader]]
+    [clojure.tools.logging :as log]
+    [clojure.walk :refer [postwalk]]
+    [clojure.string :as string]
+    [cheshire.core :as json]
+    [practitest-firecracker.query-dsl :refer [read-query]]))
 
 (defn parse-additional-fields [v]
   (postwalk #(if (string? %) (read-query %) %)
@@ -50,7 +51,7 @@
    [nil "--additional-run-fields JSON"
     "JSON containing the fields that should be added when creating PractiTest Runs"
     :default {}
-    :parse-fn parse-additional-fields]    
+    :parse-fn parse-additional-fields]
    ;; [nil "--test-case-as-pt-test" :default true]
    [nil "--test-case-as-pt-test-step" :default true]
    #_[nil "--pt-test-name DSL"
@@ -103,7 +104,7 @@
     new-parsed-json))
 
 (defn parse-args [args]
-  (let [{:keys [options arguments errors summary]} (parse-opts args cli-options)
+  (let [{:keys [options arguments errors summary]} (cli/parse-opts args cli-options)
         new-parsed-json  (when (not (= (:config-path options) nil)) (parse-config-file options))
         options          (merge options new-parsed-json)]
     (cond
