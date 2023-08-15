@@ -201,7 +201,6 @@
                                  (contains? testname-test2 (str name ":" vals))))
                              instances)
                            instances)
-        log (when display-action-logs (do (log/infof "filter-instances: ") (pprint/pprint filter-instances)))
 
         ts-id-instance-num (into {} (map (fn [testset-id-name]
                                            {(first (first testset-id-name))
@@ -271,7 +270,10 @@
         test-by-id (group-by (fn [test] (read-string (:id (last test)))) all-tests)
         new-intstances (flatten (for [instances-part (partition-all 100 (shuffle make-instances))]
                                   (api/ll-create-instances client [project-id display-action-logs] instances-part)))
-        all-intstances (into [] (concat new-intstances filter-instances))
+        all-intstances (into [] (concat new-intstances (if
+                                                         (not-empty pt-instance-params)
+                                                         filter-instances
+                                                         instances)))
 
         instance-to-ts-test (group-by (fn [inst] [(:set-id (:attributes inst)) (:test-id (:attributes inst))]) all-intstances)]
     (when display-run-time (print-run-time "Time - after create instances: %d:%d:%d" start-time))
