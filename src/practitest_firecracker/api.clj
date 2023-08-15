@@ -103,14 +103,14 @@
                                       :attributes attributes
                                       :instances  {:test-ids test-ids}}}}))))
 
-(defn make-instances [testset-tests testid-params]
+(defn make-instances [testset-tests testname-to-params test-id-testname]
   (for [[testset-id test-ids-num] testset-tests
         test-id-num test-ids-num
         index (range (last test-id-num))]
-    {:type       "instances"
-     :attributes {:set-id     testset-id
-                  :test-id    (first test-id-num)
-                  :parameters (get testid-params (first test-id-num))}}))
+      {:type       "instances"
+       :attributes {:set-id     testset-id
+                    :test-id    (first test-id-num)
+                    :parameters (get (get testname-to-params (get test-id-testname (first test-id-num))) index)}}))
 
 (defn has-duplicates? [key runs]
   (let [grouped (group-by key (into [] runs))]

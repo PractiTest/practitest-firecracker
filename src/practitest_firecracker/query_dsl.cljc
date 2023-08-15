@@ -71,11 +71,11 @@
                              (return-error "Syntax error: 'join' argument has to be ISeqable (String, Array etc.)" query))
                            (return-error "Syntax error: 'join' must have one argument" query))
     'split               (if (= 2 (count args))
-                           (let [quoted    #?(:clj  (string/escape (first args) char-escape-string)
-                                              :cljs (first args))
-                                 complied  #?(:clj  (java.util.regex.Pattern/compile quoted)
-                                              :cljs (js/RegExp. quoted))]
-                             (string/split (second args) complied))
+                           (if (empty? (last args))
+                             (last args)
+                             (let [complied  #?(:clj  (java.util.regex.Pattern/compile (first args))
+                                                :cljs (js/RegExp. (first args)))]
+                               (string/split (second args) complied)))
                            (return-error "Syntax error: 'split' must have two arguments" query))
     'get               (if (= 2 (count args))
                          (first (take 1 (drop (- (parse-int (first args)) 1) (last args))))
