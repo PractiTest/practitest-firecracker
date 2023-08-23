@@ -263,7 +263,7 @@
                                      (map
                                        (fn [test-name]
                                          {test-name
-                                          [(into {} (difference (set (get new-map test-name)) (set (get existing-instance test-name))))]})
+                                          (into [] (difference (set (get new-map test-name)) (set (get existing-instance test-name))))})
                                        (keys new-map)))
 
         make-instances (flatten (api/make-instances missing-instances new-testname-to-params test-id-testname))
