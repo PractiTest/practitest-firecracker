@@ -46,7 +46,7 @@
       :class-name (when (:classname attrs) (last (str/split (:classname attrs) #"\.")))
       :failure-type (if (and case-type (first case-type)) (:tag (first case-type)) nil)
       ;; :case-type         case-type
-      ;; :case-content      content
+      :case-content      content
       ;; :name              name
       :test-case-name name
       :pt-test-step-name name
