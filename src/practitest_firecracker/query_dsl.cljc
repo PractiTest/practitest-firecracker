@@ -119,7 +119,8 @@
                      query))]
     (if (not (or (number? query)
                  (string? query)
-                 (double? query)))
+                 (double? query)
+                 (nil? query)))
                (with-meta (compiler query)
                           {:query true})
                (compiler query))))
