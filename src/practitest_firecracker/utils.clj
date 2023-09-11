@@ -39,7 +39,7 @@
                              (interpose "|"
                                         (map #(java.util.regex.Pattern/quote %)
                                              (keys values-map)))))
-                    (filter #(not (nil? (first %))) values-map))))
+                    values-map)))
 
 (defn replace-keys [params]
   (when params
