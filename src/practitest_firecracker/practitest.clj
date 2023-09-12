@@ -54,10 +54,10 @@
               test-name (first t)
               params     (get new-map test-name)
               test-test-cases (get test-cases test-id)
-              t-test-cases (filter (fn [case]
-                                     (if
-                                       (:only-failed-steps options)
-                                       (not (= "" (:failure-detail case))) true)) (:test-cases (second t)))]
+              t-test-cases (filter
+                             (fn [case]
+                               (not (and (:only-failed-steps options) (= "" (:failure-detail case)))))
+                             (:test-cases (second t)))]
           (assoc-in t
                     [1 :test-cases]
                     (map first
