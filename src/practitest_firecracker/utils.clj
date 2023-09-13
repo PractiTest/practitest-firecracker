@@ -43,4 +43,4 @@
 
 (defn replace-keys [params]
   (when params
-    (into {} (map (fn [[x y]] {(when x (str "<" (name x) ">")) y}) params))))
+    (into {} (map (fn [[x y]] {(when x (str "<" (name (str x)) ">")) y}) params))))
