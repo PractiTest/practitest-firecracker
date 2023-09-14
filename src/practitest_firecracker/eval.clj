@@ -116,8 +116,8 @@
                        (or (:pt-test-step-name test-case)
                            (sf-test-case->pt-step-name options test-case)))
      :description    new-desc
-     :actual-results (when (is-failed-step (:use-test-step options) new-desc (str (:failure-message test-case) \newline (:failure-detail test-case))) (str (:failure-message test-case) \newline (:failure-detail test-case)))
-     :status         (case (when (is-failed-step (:use-test-step options) new-desc (:failure-detail test-case)) (:failure-type test-case))
+     :actual-results (when (is-failed-step (:only-failed-steps options) new-desc (str (:failure-message test-case) \newline (:failure-detail test-case))) (str (:failure-message test-case) \newline (:failure-detail test-case)))
+     :status         (case (when (is-failed-step (:only-failed-steps options) new-desc (:failure-detail test-case)) (:failure-type test-case))
                        :failure "FAILED"
                        :skipped "N/A"
                        :error "FAILED"
