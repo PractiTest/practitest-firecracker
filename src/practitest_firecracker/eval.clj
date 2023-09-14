@@ -105,8 +105,9 @@
                               additional-testset-fields)
                        (map :id tests))))
 
-(defn is-failed-step [use-test-step desc failure-detail]
-  (and use-test-step (not (nil? failure-detail)) (string/includes? failure-detail desc)))
+(defn is-failed-step [only-failed-steps desc failure-detail]
+  (or (not only-failed-steps)
+    (and (not (nil? failure-detail)) (string/includes? failure-detail desc))))
 
 (defn sf-test-case->run-step-def [options params test-case]
   (let [description (or (:description test-case) (sf-test-case->pt-step-description options test-case))
@@ -116,7 +117,12 @@
                        (or (:pt-test-step-name test-case)
                            (sf-test-case->pt-step-name options test-case)))
      :description    new-desc
-     :actual-results (when (is-failed-step (:only-failed-steps options) new-desc (str (:failure-message test-case) \newline (:failure-detail test-case))) (str (:failure-message test-case) \newline (:failure-detail test-case)))
+     :actual-results (when
+                       (is-failed-step
+                         (:only-failed-steps options)
+                         new-desc
+                         (str (:failure-message test-case) \newline (:failure-detail test-case)))
+                       (str (:failure-message test-case) \newline (:failure-detail test-case)))
      :status         (case (when (is-failed-step (:only-failed-steps options) new-desc (:failure-detail test-case)) (:failure-type test-case))
                        :failure "FAILED"
                        :skipped "N/A"
