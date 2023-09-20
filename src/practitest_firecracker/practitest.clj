@@ -46,14 +46,14 @@
           {}
           (distinct (into (keys map1) (keys map2)))))
 
-(defn update-steps [use-test-step old-tests test-cases match-step-by options new-map]
-  (if use-test-step
+(defn update-steps [old-tests test-id-to-cases test-name-to-params options]
+  (if (:use-test-step options)
     (map
       (fn [t]
         (let [test-id (Integer/parseInt (:id (last t)))
               test-name (first t)
-              params     (get new-map test-name)
-              test-test-cases (get test-cases test-id)
+              params     (get test-name-to-params test-name)
+              test-test-cases (get test-id-to-cases test-id)
               t-test-cases (filter
                              (fn [case]
                                (not (and (:only-failed-steps options) (= "" (:failure-detail case)))))
@@ -67,7 +67,7 @@
                                                       (reduce (fn [p param]
                                                                 (or p
                                                                     (replace-map
-                                                                      (if (= match-step-by "description")
+                                                                      (if (= (:match-step-by options) "description")
                                                                         (:description case)
                                                                         (:pt-test-step-name case))
                                                                       (replace-keys param))))
@@ -77,7 +77,7 @@
                                                    (reduce (fn [p param]
                                                              (or p
                                                                  (replace-map
-                                                                   (if (= match-step-by "description")
+                                                                   (if (= (:match-step-by options) "description")
                                                                      (eval/sf-test-case->pt-step-description options case)
                                                                      (eval/sf-test-case->pt-step-name options case))
                                                                    (replace-keys param))))
@@ -160,7 +160,7 @@
 
 (defn create-instances [[all-tests org-xml-tests testset-id-to-name ts-id-test-name-num-instances test-id-to-cases tests-after]
                         client
-                        {:keys [project-id display-action-logs display-run-time pt-instance-params use-test-step match-step-by] :as options} start-time]
+                        {:keys [project-id display-action-logs display-run-time pt-instance-params] :as options} start-time]
   (when display-action-logs (log/infof "pt-instance-params: %s" pt-instance-params))
   (let [all-test-ids (map (fn [test] (:id (last test))) all-tests)
         testname-test (into {} (map (fn [test] {(first test) test}) all-tests))
@@ -203,7 +203,7 @@
                                        #(eval/sf-test-suite->pt-test-name options %)
                                        org-xml-tests))))
 
-        testname-test2 (when
+        test-name-param-vals (when
                          (not-empty pt-instance-params)
                          (into
                            #{}
@@ -223,7 +223,7 @@
                                   test-type (:test-type (:attributes (last obj-test)))
                                   params (if (= test-type "BDDTest") bdd-parameters parameters)
                                   vals (into [] (if (map? params) (vals params) params))]
-                                 (contains? testname-test2 (str name ":" vals))))
+                                 (contains? test-name-param-vals (str name ":" vals))))
                              instances)
                            instances)
 
@@ -262,7 +262,7 @@
                                         (get-in inst [:attributes :name]))
                                       filter-instances))))
 
-        new-map (into {}
+        test-name-to-params (into {}
                       (map
                         (fn [test-name]
                           (reduce (fn [a b]
@@ -293,10 +293,13 @@
                                      (map
                                        (fn [test-name]
                                          {test-name
-                                          (into [] (difference (set (get new-map test-name)) (set (get existing-instance test-name))))})
-                                       (keys new-map)))
+                                          (into []
+                                                (difference
+                                                  (set (get test-name-to-params test-name))
+                                                  (set (get existing-instance test-name))))})
+                                       (keys test-name-to-params)))
 
-        tests-with-steps (update-steps use-test-step all-tests test-id-to-cases match-step-by options new-map)
+        tests-with-steps (update-steps all-tests test-id-to-cases test-name-to-params options)
         all-tests (concat tests-after tests-with-steps)
         make-instances (flatten (api/make-instances missing-instances new-testname-to-params test-id-testname))
         test-by-id (group-by (fn [test] (read-string (:id (last test)))) all-tests)
@@ -307,24 +310,33 @@
                                                          filter-instances
                                                          instances)))
 
+        group-xml-tests (group-by
+                          (fn [test]
+                            [(eval/sf-test-suite->pt-test-name options test)
+                             (when pt-instance-params (split-n-filter-instance-params test pt-instance-params))])
+                          org-xml-tests)
+
         instance-to-ts-test (group-by (fn [inst] [(:set-id (:attributes inst)) (:test-id (:attributes inst))]) all-intstances)]
     (when display-run-time (print-run-time "Time - after create instances: %d:%d:%d" start-time))
-    [test-by-id instance-to-ts-test new-map]))
+    [test-by-id instance-to-ts-test test-name-to-params group-xml-tests]))
 
-(defn make-runs [[test-by-id instance-to-ts-test new-map] client {:keys [project-id display-action-logs] :as options} start-time]
+(defn make-runs [[test-by-id instance-to-ts-test test-name-to-params group-xml-tests] client {:keys [display-action-logs] :as options} start-time]
   (when display-action-logs (log/infof "make-runs"))
   (flatten (doall
              (for [[test-testset instances] instance-to-ts-test]
                (map-indexed
                  (fn [index instance]
-                   (let [[ts-id test-id] test-testset
+                   (let [[_ test-id] test-testset
                          tst (first (get test-by-id test-id))
-                         params (get new-map (get tst 0))
+                         test-name (get tst 0)
+                         params (get test-name-to-params test-name)
                          this-param  (get params index)
-                         [run run-steps] (eval/sf-test-suite->run-def options (get tst 1) this-param)
+                         xml-test (get group-xml-tests [test-name (vals this-param)])
+                         sys-test (get tst 1)
+                         [run run-steps] (eval/sf-test-suite->run-def options (first xml-test) sys-test this-param)
                          additional-run-fields (eval/eval-additional-fields run (:additional-run-fields options))
                          additional-run-fields (merge additional-run-fields (:system-fields additional-run-fields))
-                         run (eval/sf-test-run->run-def additional-run-fields (get tst 1))]
+                         run (eval/sf-test-run->run-def additional-run-fields sys-test)]
                      {:instance-id (:id instance)
                       :attributes  run
                       :steps       run-steps})) instances)))))

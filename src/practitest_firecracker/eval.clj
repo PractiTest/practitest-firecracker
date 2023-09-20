@@ -107,22 +107,23 @@
 
 (defn is-failed-step [only-failed-steps desc failure-detail]
   (or (not only-failed-steps)
-    (and (not (nil? failure-detail)) (string/includes? failure-detail desc))))
+    (and
+      (not (nil? failure-detail))
+      (not (nil? desc))
+      (string/includes? failure-detail desc))))
 
-(defn sf-test-case->run-step-def [options params test-case]
-  (let [description (or (:description test-case) (sf-test-case->pt-step-description options test-case))
-        new-desc    (replace-map description (replace-keys params))]
+(defn sf-test-case->run-step-def [options params test-suite-cases test-case]
+  (let [grouped-case  (group-by (fn [case] (sf-test-case->pt-step-description options case)) test-suite-cases)
+        description (or (:description test-case) (sf-test-case->pt-step-description options test-case))
+        new-desc    (replace-map description (replace-keys params))
+        origin-case (first (get grouped-case new-desc))
+        msg         (str (or (:failure-message origin-case) (:failure-message test-case)) \newline (:failure-detail test-case))]
     {:name           (if (nil? (:position test-case))
                        (sf-test-case->pt-step-name options test-case)
                        (or (:pt-test-step-name test-case)
                            (sf-test-case->pt-step-name options test-case)))
      :description    new-desc
-     :actual-results (when
-                       (is-failed-step
-                         (:only-failed-steps options)
-                         new-desc
-                         (str (:failure-message test-case) \newline (:failure-detail test-case)))
-                       (str (:failure-message test-case) \newline (:failure-detail test-case)))
+     :actual-results (when (is-failed-step (:only-failed-steps options) new-desc msg) msg)
      :status         (case (when (is-failed-step (:only-failed-steps options) new-desc (:failure-detail test-case)) (:failure-type test-case))
                        :failure "FAILED"
                        :skipped "N/A"
@@ -131,10 +132,10 @@
                        nil "PASSED"
                        "NO RUN")}))
 
-(defn sf-test-suite->run-def [options test-suite params]
-  [{:run-duration (:time-elapsed test-suite)}
-   (map (partial sf-test-case->run-step-def options params)
-        (sort-by :position (:test-cases test-suite)))])
+(defn sf-test-suite->run-def [options test-suite sys-test params]
+  [{:run-duration (:time-elapsed sys-test)}
+   (map (partial sf-test-case->run-step-def options params (:test-cases test-suite))
+        (sort-by :position (:test-cases sys-test)))])
 
 (defn sf-test-run->run-def [custom-fields run-duration]
   {:run-duration  (:time-elapsed run-duration),
