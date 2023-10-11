@@ -100,6 +100,7 @@
                                              (when (:additional-test-fields parsed-json) {:additional-test-fields new-additional-test-fields})
                                              (when (:additional-run-fields parsed-json) {:additional-run-fields new-additional-run-fields})
                                              (when (:pt-test-name parsed-json) {:pt-test-name (read-query (:pt-test-name parsed-json))})
+                                             (when (:pt-test-step-description parsed-json) {:pt-test-step-description (read-query (:pt-test-step-description parsed-json))})
                                              (when (:pt-test-step-name parsed-json) {:pt-test-step-name (read-query (:pt-test-step-name parsed-json))}))]
     new-parsed-json))
 

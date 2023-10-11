@@ -1,15 +1,15 @@
 (ns practitest-firecracker.utils
   (:require
-   [clj-time.core                      :as t]
-   [clojure.pprint                     :as pprint]
-   [clojure.string                     :as string]
-   [cheshire.core                      :as json]))
+    [clj-time.core :as t]
+    [clojure.pprint :as pprint]
+    [clojure.string :as string]
+    [cheshire.core :as json]))
 
 (defn print-run-time [text start-time]
-  (let [sec-pass   (t/in-seconds (t/interval start-time (t/now)))
-        secs       (mod 60 (t/in-seconds (t/interval start-time (t/now))))
-        minutes    (if (> sec-pass 60) (mod 60 (t/in-minutes (t/interval start-time (t/now)))) 0)
-        hours      (if (> sec-pass 3600) (t/in-hours (t/interval start-time (t/now))) 0)]
+  (let [sec-pass (t/in-seconds (t/interval start-time (t/now)))
+        secs (mod 60 (t/in-seconds (t/interval start-time (t/now))))
+        minutes (if (> sec-pass 60) (mod 60 (t/in-minutes (t/interval start-time (t/now)))) 0)
+        hours (if (> sec-pass 3600) (t/in-hours (t/interval start-time (t/now))) 0)]
     (pprint/pprint (format text hours minutes secs))))
 
 (defn test-need-update? [test-suite test]
@@ -30,3 +30,17 @@
   (with-out-str
     (apply pprint/pprint args)))
 
+(defn replace-map
+  [string values-map]
+  (when (and string (not (empty? (filter #(not (nil? (first %))) values-map))))
+    (string/replace string
+                    (re-pattern
+                      (apply str
+                             (interpose "|"
+                                        (map #(java.util.regex.Pattern/quote %)
+                                             (keys values-map)))))
+                    values-map)))
+
+(defn replace-keys [params]
+  (when params
+    (into {} (map (fn [[x y]] {(when x (str "<" (if (keyword? x) (name x) x) ">")) y}) params))))

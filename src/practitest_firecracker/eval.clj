@@ -1,11 +1,11 @@
 (ns practitest-firecracker.eval
   (:require
     [clojure.string :as string]
-    [practitest-firecracker.query-dsl :refer [query? eval-query]]
+    [practitest-firecracker.query-dsl :refer [query? eval-query read-query]]
     [clojure.walk :refer [postwalk]]
-    [clojure.tools.logging :as log]
-    [practitest-firecracker.utils :refer [pformat]]
-    [practitest-firecracker.api :as api]))
+    [practitest-firecracker.utils :refer [pformat replace-map replace-keys]]
+    [practitest-firecracker.api :as api]
+    [clojure.pprint :as pprint]))
 
 (def custom-field-cache (atom {}))
 
@@ -17,12 +17,17 @@
   (let [test-name (eval-query suite (:pt-test-name options))]
     (if (string/blank? test-name) "UNNAMED" test-name)))
 
+(defn sf-test-case->pt-step-description [options test-case]
+  (let [step-name (eval-query test-case (:pt-test-step-description options))]
+    (if (string/blank? step-name) "UNNAMED" step-name)))
+
 (defn sf-test-case->pt-step-name [options test-case]
   (let [step-name (eval-query test-case (:pt-test-step-name options))]
     (if (string/blank? step-name) "UNNAMED" step-name)))
 
 (defn sf-test-case->step-def [options test-case]
-  {:name (sf-test-case->pt-step-name options test-case)})
+  {:name (sf-test-case->pt-step-name options test-case)
+   :description (sf-test-case->pt-step-description options test-case)})
 
 (defn sf-test-suite->test-def [options test-suite]
   [{:name (sf-test-suite->pt-test-name options test-suite)}
@@ -100,21 +105,37 @@
                               additional-testset-fields)
                        (map :id tests))))
 
-(defn sf-test-case->run-step-def [options test-case]
-  {:name           (sf-test-case->pt-step-name options test-case)
-   :actual-results (str (:failure-message test-case) \newline (:failure-detail test-case))
-   :status         (case (:failure-type test-case)
-                     :failure "FAILED"
-                     :skipped "N/A"
-                     :error "FAILED"
-                     ;; will leave error as FAILED for now, will change it after we add the UI changes and add the option of ERROR to Reqirement Test and TestSet table of runs
-                     nil "PASSED"
-                     "NO RUN")
-   :description    (:description test-case)})
+(defn is-failed-step [only-failed-steps desc failure-detail]
+  (or (not only-failed-steps)
+    (and
+      (not (nil? failure-detail))
+      (not (nil? desc))
+      (string/includes? failure-detail desc))))
 
-(defn sf-test-suite->run-def [options test-suite]
-  [{:run-duration (:time-elapsed test-suite)}
-   (map (partial sf-test-case->run-step-def options) (:test-cases test-suite))])
+(defn sf-test-case->run-step-def [options params test-suite-cases test-case]
+  (let [grouped-case  (group-by (fn [case] (sf-test-case->pt-step-description options case)) test-suite-cases)
+        description (or (:description test-case) (sf-test-case->pt-step-description options test-case))
+        new-desc    (replace-map description (replace-keys params))
+        origin-case (first (get grouped-case new-desc))
+        msg         (str (or (:failure-message origin-case) (:failure-message test-case)) \newline (:failure-detail test-case))]
+    {:name           (if (nil? (:position test-case))
+                       (sf-test-case->pt-step-name options test-case)
+                       (or (:pt-test-step-name test-case)
+                           (sf-test-case->pt-step-name options test-case)))
+     :description    new-desc
+     :actual-results (when (is-failed-step (:only-failed-steps options) new-desc msg) msg)
+     :status         (case (when (is-failed-step (:only-failed-steps options) new-desc (:failure-detail test-case)) (:failure-type test-case))
+                       :failure "FAILED"
+                       :skipped "N/A"
+                       :error "FAILED"
+                       ;; will leave error as FAILED for now, will change it after we add the UI changes and add the option of ERROR to Reqirement Test and TestSet table of runs
+                       nil "PASSED"
+                       "NO RUN")}))
+
+(defn sf-test-suite->run-def [options test-suite sys-test params]
+  [{:run-duration (:time-elapsed sys-test)}
+   (map (partial sf-test-case->run-step-def options params (:test-cases test-suite))
+        (sort-by :position (:test-cases sys-test)))])
 
 (defn sf-test-run->run-def [custom-fields run-duration]
   {:run-duration  (:time-elapsed run-duration),
