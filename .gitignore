@@ -16,4 +16,4 @@ config.json
 /.lsp/sqlite.db
 /.lsp/.cache
 /.clj-kondo/.cache
-
+/.mise.toml
