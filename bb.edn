@@ -1,0 +1,3 @@
+{:tasks
+ {dev {:doc "Run dev repl"
+       :task (clojure "-M:dev:repl")}}}

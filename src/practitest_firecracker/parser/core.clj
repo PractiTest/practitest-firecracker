@@ -19,9 +19,42 @@
 (defn str-to-number [val]
   (if (not (nil? val)) (.parse (NumberFormat/getInstance) val) 0))
 
+(defn has-nested-testsuite? [element]
+  (some #(= :testsuite (:tag %)) (:content element)))
+
+(defn flatten-testsuite 
+  "xUnit sometimes has hierarchy of `testsuite` tags.
+   This function will flatten the hierarchy, capturing the parent testsuite names.
+   For example, if there is a testsuite A which has a child B, which has testcases,
+   we will leave only B, but change the name attribute to 'A: B'."
+  [element]
+  (loop [acc [] children (:content element) prefix (-> element :attrs :name)]
+    (if (empty? children)
+      acc
+      (let [head (first children)
+            tail (rest children)]
+        (if (= :testsuite (:tag head))
+          (let [head (update-in head [:attrs :name] #(str prefix ": " %))]
+            (if (has-nested-testsuite? head)
+              (recur (concat acc (flatten-testsuite head)) tail prefix)
+              (recur (conj acc head) tail prefix)))
+          (recur (conj acc head) tail prefix))))))
+
+(defn preprocess-xunit 
+  "Support for xUnit.
+   Since xUnit does not have root testsuites tag, but does have hierarchy of testsuite tags (sometimes),
+   Here we will wrap it in a fake testsuites tag.
+   This is done to support the case when `flatten-testsuite` returns a list of the testsuites."
+  [root]
+  (if (and (= :testsuite (:tag root))
+           (has-nested-testsuite? root))
+    {:tag :testsuites :content (flatten-testsuite root)}
+    root))
+
 (defn zip-str [s]
   (zip/xml-zip
-    (xml/parse (ByteArrayInputStream. (.getBytes s "UTF-8")))))
+    (preprocess-xunit 
+      (xml/parse (ByteArrayInputStream. (.getBytes s "UTF-8"))))))
 
 (defn filter-tags [tag-key xml-content]
   (let [filter-result (filter #(= (:tag %) tag-key) xml-content)]
@@ -198,3 +231,16 @@
     (let [result (get-dir-by-path arg (= "true" multi-test-cases) (= "true" multi-testsets) testset-name (= "true" sample))]
       result)
     (throw (Exception. "Must have at least one argument!"))))
+
+(comment
+  (let [s (slurp "test-data/robot/RobotDemo/xunit-combinded.xml")]
+    (zip/xml-zip
+      (preprocess-xunit
+        (xml/parse (ByteArrayInputStream. (.getBytes s "UTF-8"))))))
+
+  (let [s (slurp "test-data/carmit/junit-report.xml")]
+    (zip/xml-zip
+      (preprocess-xunit
+        (xml/parse (ByteArrayInputStream. (.getBytes s "UTF-8"))))))
+
+  )
