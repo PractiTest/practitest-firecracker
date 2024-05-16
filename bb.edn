@@ -1,3 +1,5 @@
 {:tasks
  {dev {:doc "Run dev repl"
-       :task (clojure "-M:dev:repl")}}}
+       :task (clojure "-M:dev")}
+  release {:doc "Build uberjar"
+           :task (clojure "-T:build uber")}}}
