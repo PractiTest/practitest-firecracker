@@ -6,10 +6,22 @@ If the structure of the report changes (new tests are added for example), you wi
 If you don't have an existing CONFIG_FILE and you want to use it, go to https://firecracker-ui-prod.practitest.com/ and generate one.
 To login, you can use your PractiTest credentials and follow the instructions in the link. Then you can continue here and set the config-path to your configuration file path.
 
+## Pre-requisites
+
+- JDK 11
+- Babashka
+- Clojure CLI
+
+## REPL
+
+```shell
+bb dev
+```
+
 ## Building uberjar
 
 ```shell
-clojure -A:depstar -m hf.depstar.uberjar practitest-firecracker-standalone.jar -C -m practitest-firecracker.core
+bb release
 ```
 
 ## Usage
@@ -18,16 +30,17 @@ clojure -A:depstar -m hf.depstar.uberjar practitest-firecracker-standalone.jar -
 
 At every point you can run:
 
-``` shell
+```shell
 java -jar practitest-firecracker-standalone.jar help
 ```
+
 to get more information about the parameters and commands.
 
 ### version
 
 To check your jar version you can you this command:
 
-``` shell
+```shell
 java -jar practitest-firecracker-standalone.jar version
 ```
 
@@ -37,14 +50,15 @@ This will attempt to do the two actions above at once. It will search for a Test
 
 Example:
 
-``` shell
+```shell
 java -jar practitest-firecracker-standalone.jar \
     --reports-path=REPORTS_FOLDER_PATH \
     --author-id=PRACTITEST_USER_ID \
     --config-path=CONFIG_FILE \
     create-and-populate-testset
 ```
-* author-id is not required in case of PAT (personal api token) is in use
+
+- author-id is not required in case of PAT (personal api token) is in use
 
 The call above will analyze the surefire reports and create and populate tests and the testset. If a test already exists, it will be reused.
 
@@ -65,9 +79,9 @@ parameters:
 --additional-run-fields '{"custom-fields": {"---f-124": "test"}, "system-fields"{}}
 if they are relevant to the run (additional-fields not required).
 
-
 Example:
-``` shell
+
+```shell
 java -jar practitest-firecracker-standalone.jar \
     --api-token=YOUR_API_TOKEN \
     --email=YOUR_EMAIL \
@@ -87,6 +101,7 @@ You can set various custom fields for tests when they are created (especially us
 Replace the field ids with the actual IDs, you can see all your custom fields by calling this API call: [get-all-custom-fields-in-your-project](https://www.practitest.com/api-v2/#get-all-custom-fields-in-your-project)
 
 ### Additional options
+
 If you want to use firecracker custom uris you will need to add this --api-uri parameter like this
 for stage:
 --api-uri=https://stage.practitest.com/
