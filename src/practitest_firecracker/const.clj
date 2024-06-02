@@ -1,6 +1,6 @@
 (ns practitest-firecracker.const)
 
-(def ^:const fc-version "2.1.1")
+(def ^:const fc-version "2.1.2")
 
 (def ^:const testset-instances-uri "/projects/%d/instances.json")
 (def ^:const test-uri "/projects/%d/tests/%d.json")
