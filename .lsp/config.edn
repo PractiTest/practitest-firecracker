@@ -1,0 +1,6 @@
+{:auto-add-ns-to-new-files? false
+ :keep-parens-when-threading? true
+ :cljfmt {:function-arguments-indentation :cursive}
+ :java {:home-path true}
+ :clean {:ns-inner-blocks-indentation :keep
+         :ns-import-classes-indentation :same-line}}
