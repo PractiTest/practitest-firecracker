@@ -4,8 +4,9 @@
     [clojure.string :as str]
     [clojure.xml :as xml]
     [clojure.zip :as zip])
-  (:import (java.text NumberFormat)
-           (java.io ByteArrayInputStream)))
+  (:import
+    (java.io ByteArrayInputStream)
+    (java.text NumberFormat)))
 
 (defn round
   [x & {p :precision}]
@@ -51,10 +52,27 @@
     {:tag :testsuites :content (flatten-testsuite root)}
     root))
 
+(defn normalize-attribute [value]
+  (when value
+    (str/replace value "/" ".")))
+
+(defn normalize-attributes
+  "Sometimes `classname` and `name` contain '/', we need to replace it with '.'"
+  [element]
+  (if (map? element)
+    (if-let [_attrs (:attrs element)]
+      (-> element
+          (update-in [:attrs :name] normalize-attribute)
+          (update-in [:attrs :classname] normalize-attribute)
+          (update :content #(map normalize-attributes %)))
+      (update element :content #(map normalize-attributes %)))
+    element))
+
 (defn zip-str [s]
   (zip/xml-zip
-    (preprocess-xunit 
-      (xml/parse (ByteArrayInputStream. (.getBytes s "UTF-8"))))))
+    (normalize-attributes
+      (preprocess-xunit 
+        (xml/parse (ByteArrayInputStream. (.getBytes s "UTF-8")))))))
 
 (defn filter-tags [tag-key xml-content]
   (let [filter-result (filter #(= (:tag %) tag-key) xml-content)]
@@ -240,6 +258,11 @@
 
   (let [s (slurp "test-data/carmit/junit-report.xml")]
     (zip/xml-zip
+      (preprocess-xunit
+        (xml/parse (ByteArrayInputStream. (.getBytes s "UTF-8"))))))
+
+  (let [s (slurp "test-data/pb/report.xml")]
+    (normalize-attributes
       (preprocess-xunit
         (xml/parse (ByteArrayInputStream. (.getBytes s "UTF-8"))))))
 
