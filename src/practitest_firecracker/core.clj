@@ -33,7 +33,7 @@
             directory          (:reports-path options)
             dirs               (when-not (nil? directory) (for [dir directory] (io/file dir)))
             parsed-dirs        (when-not (nil? dirs) (for [dir (file-seq (first dirs))] (parse-files dir)))
-            additional-reports (send-directory parsed-dirs (:test-case-as-pt-test-step options) (:multitestset options) (:testset-name options) false)
+            additional-reports (send-directory parsed-dirs options false)
             start-time         (t/now)]
           (case action
             "display-config"
@@ -61,3 +61,31 @@
                    (make-runs client options start-time)
                    (create-runs client options start-time)))
               (exit 0 (format "Done"))))))))
+
+;; Manual run
+(comment
+  (let [
+        {:keys [action options exit-message ok?]}
+        (parse-args ["--config-path" "/Users/deshilov/work/practitest/firecracker-env/FC_localhost_BDD.json"
+                     "--reports-path" "/Users/deshilov/work/practitest/firecracker-env/reports"
+                     "--api-uri" "http://localhost:3000"
+                     "--display-action-logs"
+                     "--author-id" "2"
+                     "--project-id" "3"
+                     "--detect-bdd-steps"
+                     "--display-action-logs"
+                     "create-and-populate-testset"])
+
+        client             (make-client (select-keys options [:email :api-token :api-uri :max-api-rate]))
+        directory          (:reports-path options)
+        dirs               (when-not (nil? directory) (for [dir directory] (io/file dir)))
+        parsed-dirs        (when-not (nil? dirs) (for [dir (file-seq (first dirs))] (parse-files dir)))
+        additional-reports (send-directory parsed-dirs options false)
+        start-time         (t/now)
+        ]
+    (-> (create-testsets client options additional-reports)
+        (group-tests client options)
+        (create-or-update-tests client options start-time)
+        (create-instances client options start-time)
+        (make-runs client options start-time)
+        (create-runs client options start-time))))

@@ -331,7 +331,7 @@
                          test-name (get tst 0)
                          params (get test-name-to-params test-name)
                          this-param  (get params index)
-                         xml-test (get group-xml-tests [test-name (vals this-param)])
+                         xml-test (get group-xml-tests [test-name (or (vals this-param) [])])
                          sys-test (get tst 1)
                          [run run-steps] (eval/sf-test-suite->run-def options (first xml-test) sys-test this-param)
                          additional-run-fields (eval/eval-additional-fields run (:additional-run-fields options))
