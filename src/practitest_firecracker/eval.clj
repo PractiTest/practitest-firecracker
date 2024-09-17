@@ -147,9 +147,9 @@
 (defn bdd-test-case->run-step-def [test-case]
   {:name (:pt-test-step-name test-case)
    :description (:description test-case)
-   :actual-results (if (:has-failure? test-case)
-                     (:failure-detail test-case)
-                     (:bdd-line test-case))
+   ;; Include actual results for failure and error cases
+   :actual-results (when (#{:failure :error} (:status test-case))
+                     (:failure-detail test-case))
    :status (case (:status test-case)
              :failure "FAILED"
              :skipped "N/A"

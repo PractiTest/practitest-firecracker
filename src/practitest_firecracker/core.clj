@@ -94,8 +94,8 @@
   (let [
         {:keys [action options exit-message ok?]}
         (parse-args ["--config-path" "/Users/deshilov/work/practitest/firecracker-env/FC_localhost_BDD.json"
-                     "--reports-path" "/Users/deshilov/work/practitest/bdd/cucumber/js/reports"
-                     "--features-path" "/Users/deshilov/work/practitest/bdd/cucumber/js/features"
+                     "--reports-path" "/Users/deshilov/work/practitest/bdd/test2"
+                     "--features-path" "/Users/deshilov/work/practitest/bdd/test1"
                      "--api-uri" "http://localhost:3000"
                      "--display-action-logs"
                      "--author-id" "2"

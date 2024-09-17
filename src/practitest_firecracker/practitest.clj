@@ -3,7 +3,7 @@
     [clojure.set :refer [difference]]
     [clojure.string :as string]
     [clojure.tools.logging :as log]
-    [practitest-firecracker.utils :refer [print-run-time test-need-update? pformat replace-map replace-keys]]
+    [practitest-firecracker.utils :refer [print-run-time test-need-update? pformat replace-map replace-keys transform-keys]]
     [practitest-firecracker.api :as api]
     [practitest-firecracker.const :refer [max-test-ids-bucket-size]]
     [practitest-firecracker.query-dsl :as query-dsl]
@@ -146,20 +146,34 @@
       (when display-run-time (print-run-time "Time - after update tests: %d:%d:%d" start-time)))
     [new-all-tests org-xml-tests testset-id-to-name ts-id-test-name-num-instances test-id-to-cases tests-after]))
 
-(defn split-n-filter-instance-params [test pt-instance-params]
-  (if (= "?outline-params-row" pt-instance-params)
-    ;; Special handling for BDD params - return bare row from outline example table
-    (:outline-params-row test)
-    (into []
-          (map
-            (fn [param]
-              (string/trim param))
-            (filter not-empty
-                    (string/split
-                      (query-dsl/eval-query
-                        test
-                        (query-dsl/read-query pt-instance-params))
-                      #"\|"))))))
+
+
+;; API returns mangled parameters because of rails key transformation, so for lookup purposes
+;; we're trying to mimic what rails does to parameter keys
+(defn- transform-rails-key [key]
+  ;; TODO: https://apidock.com/rails/v7.1.3.2/ActiveSupport/Inflector/underscore
+  (keyword (string/lower-case (str key))))
+
+(defn- transform-rails-parameters [params-map]
+  (transform-keys params-map transform-rails-key))
+
+(defn get-parameters-map [test pt-instance-params]
+  (transform-rails-parameters
+    (if (= "?outline-params" pt-instance-params)
+      ;; Special handling for BDD params - return bare row from outline example table
+      (:outline-params-map test)
+      (zipmap
+        (iterate inc 1)
+        (into []
+              (map
+                (fn [param]
+                  (string/trim param))
+                (filter not-empty
+                        (string/split
+                          (query-dsl/eval-query
+                            test
+                            (query-dsl/read-query pt-instance-params))
+                          #"\|"))))))))
 
 (defn create-instances [[all-tests org-xml-tests testset-id-to-name ts-id-test-name-num-instances test-id-to-cases tests-after]
                         client
@@ -173,7 +187,7 @@
                         (into {}
                               (map
                                 (fn [test]
-                                  (let [split-params (split-n-filter-instance-params (second test) pt-instance-params)]
+                                  (let [split-params (get-parameters-map (second test) pt-instance-params)]
                                     {(Integer/parseInt (:id (last test)))
                                      (zipmap (iterate inc 1) split-params)}))
                                 all-tests)))
@@ -199,22 +213,19 @@
                                         (into []
                                               (map
                                                 (fn [test]
-                                                  (zipmap
-                                                    (iterate inc 1)
-                                                    (split-n-filter-instance-params test pt-instance-params))) tests))})
+                                                  (get-parameters-map test pt-instance-params)) tests))})
                                      (group-by
                                        #(eval/sf-test-suite->pt-test-name options %)
                                        org-xml-tests))))
 
-        test-name-param-vals (when
+        test-name-params (when
                          (not-empty pt-instance-params)
                          (into
                            #{}
                            (map
                              (fn [test]
-                               (str
-                                 (eval/sf-test-suite->pt-test-name options test) ":"
-                                 (split-n-filter-instance-params test pt-instance-params)))
+                               [(eval/sf-test-suite->pt-test-name options test)
+                                (get-parameters-map test pt-instance-params)])
                              org-xml-tests)))
 
         filter-instances (if (not-empty pt-instance-params)
@@ -225,9 +236,12 @@
                                   obj-test (get testname-test name)
                                   test-type (:test-type (:attributes (last obj-test)))
                                   params (if (= test-type "BDDTest") bdd-parameters parameters)
-                                  vals (into [] (if (map? params) (vals params) params))]
-                                 (if (seq parameters)
-                                   (contains? test-name-param-vals (str name ":" vals))
+                                  params (if (map? params)
+                                           params
+                                           ;; Vector case - not sure when it happens, convert to map
+                                           (zipmap (iterate inc 1) params))]
+                                 (if (seq params)
+                                   (contains? test-name-params [name params])
                                    ;; Do not filter if no parameters is set
                                    true)))
                              instances)
@@ -285,10 +299,13 @@
                                          {test-name
                                           (into {}
                                                 (map (fn [y]
-                                                       {(if (contains? existing-instance test-name)
-                                                          (first y)
-                                                          (keyword (str (first y))))
-                                                        (last y)})
+                                                       (let [fy (first y)]
+                                                         {(if (contains? existing-instance test-name)
+                                                            fy
+                                                            (if (keyword? fy)
+                                                              fy
+                                                              (keyword (str fy))))
+                                                          (last y)}))
                                                      x))})
                                        (if (contains? existing-instance test-name)
                                          (get existing-instance test-name)
@@ -319,7 +336,7 @@
         group-xml-tests (group-by
                           (fn [test]
                             [(eval/sf-test-suite->pt-test-name options test)
-                             (when pt-instance-params (split-n-filter-instance-params test pt-instance-params))])
+                             (when pt-instance-params (get-parameters-map test pt-instance-params))])
                           org-xml-tests)
 
         instance-to-ts-test (group-by (fn [inst] [(:set-id (:attributes inst)) (:test-id (:attributes inst))]) all-intstances)]
@@ -337,7 +354,7 @@
                          test-name (get tst 0)
                          params (get test-name-to-params test-name)
                          this-param  (get params index)
-                         xml-test (get group-xml-tests [test-name (vals this-param)])
+                         xml-test (get group-xml-tests [test-name this-param])
                          sys-test (get tst 1)
                          [run run-steps] (eval/sf-test-suite->run-def options (first xml-test) sys-test this-param)
                          additional-run-fields (eval/eval-additional-fields run (:additional-run-fields options))

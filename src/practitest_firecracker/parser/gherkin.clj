@@ -2,7 +2,6 @@
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
             [clojure.tools.logging :as log]
-            [practitest-firecracker.parser.core :as pc]
             [lambdaisland.cucumber.gherkin :as gherkin]
             [lambdaisland.cucumber.jvm :as jvm])
   (:import (java.io BufferedReader StringReader)))
@@ -11,13 +10,16 @@
   "Turns example table into vector of maps - args associated with values"
   [example]
   (map
-    (fn [table-header table-row]
+    (fn [table-header table-row idx]
       ;; We need both map for lookups
       {:map (zipmap table-header table-row)
        ;; And ordered row (due to the way firecracker params are implemented)
-       :row table-row})
+       :row table-row
+       ;; And we need index as well (0-based here)
+       :index idx})
     (repeat (:table-header example))
-    (:table-body example)))
+    (:table-body example)
+    (range)))
 
 (defn- expand-arguments
   "Substitutes <arg> with values from params-map"
@@ -33,10 +35,23 @@
   [scenario feature]
   (let [examples (:examples scenario)
         all-params (glue-example-arguments (first examples))]
-    (map (fn [param]
-           [[(:name feature) (expand-arguments (:name scenario) (:map param))]
-            ;; Store params and values here for future reference
-            (assoc scenario :outline-params param)])
+    (mapcat
+      (fn [param]
+        ;; Store params and values here for future reference
+        (let [result (assoc scenario :outline-params param)
+              expanded-name (expand-arguments (:name scenario) (:map param))]
+          ;; We have couple of options out there
+          [
+           ;; 1 - simple substitution
+           ;; e.g:
+           [[(:name feature) expanded-name] result]
+
+           ;; 2 - glued as this <bare name> #1.<index>: <subst name>
+           ;; e.g: BAS.3.02.06 - Configure a Quote with Docebo Elevate Bundle - NB &lt;Opportunity Name&gt; - #1.1: BAS.3.02.06 - Configure a Quote with Docebo Elevate Bundle - NB $AT-NB-Dis-GT30-ARR-LTE75-Elevate
+           [[(:name feature)
+             (str (:name scenario) " - #1." (inc (:index param)) ": " expanded-name)] result]
+
+           ]))
          all-params)))
 
 ;; TODO: tags support ??
@@ -139,7 +154,10 @@
                (build-scenarios-lookup-map)
                (merge-with-warnings lookup-map)))
         lookup-map
-        (pc/get-files-path dir ".feature")))
+        (filter (fn [^java.io.File file]
+                  (and (not (.isDirectory file))
+                       (str/ends-with? (str/lower-case (.getName file)) ".feature")))
+                (file-seq (io/file dir)))))
     {}
     directories))
 

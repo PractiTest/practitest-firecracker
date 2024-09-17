@@ -156,21 +156,22 @@
        :description description})))
 
 (defn parse-bdd-output [case system-out]
-  (->> (for [line (str/split-lines system-out)
-             :let [trimmed (str/trim line)]
-             :when (some #(str/starts-with? trimmed %) valid-start-item)]
-         ;; try to parse both as behave and cucumber (they are mutually exclusive)
-         (or (try-parse-behave-line trimmed)
-             (try-parse-cucumber-line trimmed)))
-       (remove nil?)
-       (map (fn [{:keys [status] :as bdd-test-case}]
-              ;; Merge other data (required for further processing)
-              (dissoc (merge
-                       case
-                       bdd-test-case
-                       {:failure-type status
-                        :has-failure? (some? status)})
-                      :system-message)))))
+  (when system-out
+    (->> (for [line (str/split-lines system-out)
+               :let [trimmed (str/trim line)]
+               :when (some #(str/starts-with? trimmed %) valid-start-item)]
+           ;; try to parse both as behave and cucumber (they are mutually exclusive)
+           (or (try-parse-behave-line trimmed)
+               (try-parse-cucumber-line trimmed)))
+         (remove nil?)
+         (map (fn [{:keys [status] :as bdd-test-case}]
+                ;; Merge other data (required for further processing)
+                (dissoc (merge
+                          case
+                          bdd-test-case
+                          {:failure-type status
+                           :has-failure? (some? status)})
+                        :system-message))))))
 
 (defn- case-data [case]
   (let [content        (:content case)
@@ -243,6 +244,7 @@
       :gherkin-scenario gherkin-scenario
       ;; Extract scenario outline params to special arg (accessible via ?outline-params-row in firecracker config)
       :outline-params-row (:row (:outline-params gherkin-scenario))
+      :outline-params-map (:map (:outline-params gherkin-scenario))
       :errors (count (filter #(= (:failure-type %) :error) (:test-cases test)))
       :failures (count (filter #(= (:failure-type %) :failure) (:test-cases test)))
       :flakes (count (filter #(= (:failure-type %) :flake) (:test-cases test)))
