@@ -2,6 +2,7 @@
   (:require
     [clojure.java.io :as io]
     [clojure.string :as str]
+    [clojure.tools.logging :as log]
     [clojure.xml :as xml]
     [clojure.zip :as zip])
   (:import
@@ -126,6 +127,7 @@
       {:status (convert-bdd-status status)
        :time 0
        :test-case-name word
+       :bdd-line line
        :pt-test-step-name word
        :description description
        :full-name description})))
@@ -148,6 +150,7 @@
       {:status (convert-bdd-status status)
        :time (str-to-number time)
        :test-case-name word
+       :bdd-line line
        :pt-test-step-name word
        :full-name description
        :description description})))
@@ -167,10 +170,9 @@
                        bdd-test-case
                        {:failure-type status
                         :has-failure? (some? status)})
-                      :failure-detail
                       :system-message)))))
 
-(defn case-data [case]
+(defn- case-data [case]
   (let [content        (:content case)
         case-type      (filter #(contains? #{:error :failure :flake :skipped} (:tag %)) content)
         system-message (filter #(contains? #{:system-out :system-err} (:tag %)) content)
@@ -192,41 +194,55 @@
       :pt-test-step-name name
       :system-message system-message)))
 
-(def ^:dynamic *bdd-check* false)
-
-(defn get-case-info [test-cases]
-  (if *bdd-check*
-    (mapcat (fn [case]
-              (if (:system-message case)
-                (or (seq (parse-bdd-output case (first (:content (first (:system-message case))))))
-                    [case])
-                [case]))
-            (map case-data test-cases))
-    (map case-data test-cases)))
-
 (defn group-by-classname [val]
   (last (str/split (:classname (:attrs val)) #"\.")))
 
 (defn group-by-name [val]
   (last (str/split (:name (:attrs val)) #">")))
 
-(defn group-testcase-data [data multi-test-cases]
+(defn group-testcase-data [data {:keys [test-case-as-pt-test-step
+                                        detect-bdd-steps]
+                                 :as options}]
   (let [grouping-func (if (contains? (:attrs (first data)) :classname)
                         group-by-classname
                         group-by-name)]
-    (if multi-test-cases
+    (if test-case-as-pt-test-step
       (->> data
            (group-by grouping-func)
-           (map (fn [[k vals]] [k (into {:test-cases (get-case-info vals)} (first (map :attrs vals)))]))
+           (map
+             (fn [[k vals]]
+               [k (into {:test-cases (map case-data vals)} (first (map :attrs vals)))]))
            (into {}))
       (->> data
-           (map-indexed (fn [index val] {index (into {:test-cases (list (case-data val))} (:attrs val))}))
+           (map-indexed
+             (fn [index val]
+               {index (into
+                        {:test-cases (let [case (case-data val)]
+                                       ;; Expand data for steps if BDD detection is enabled
+                                       (if (and detect-bdd-steps
+                                                (:system-message case))
+                                         (or (seq (parse-bdd-output case (first (:content (first (:system-message case))))))
+                                             ;; Fallback to usual case
+                                             (list case))
+                                         (list case)))}
+                        (:attrs val))}))
            (into {})))))
 
-(defn test-data [test]
+(defn test-data [scenarios-map test]
   (let [package (if (:classname test) (clojure.string/join "." (drop-last (str/split (:classname test) #"\."))) (:name test))
-        name    (if (:classname test) (last (str/split (:classname test) #"\.")) (last (str/split (:name test) #">")))]
+        name (if (:classname test) (last (str/split (:classname test) #"\.")) (last (str/split (:name test) #">")))
+
+        ;; Lookup BDD scenario
+        gherkin-scenario (get scenarios-map [(:classname test) (:name test)])
+        ]
+    (when (some? gherkin-scenario)
+      (log/debug "Detected gherkin scenario" (:name gherkin-scenario) "for test" (:classname test) (:name test)))
+
     (assoc test
+      :bdd-test? (some? gherkin-scenario)
+      :gherkin-scenario gherkin-scenario
+      ;; Extract scenario outline params to special arg (accessible via ?outline-params-row in firecracker config)
+      :outline-params-row (:row (:outline-params gherkin-scenario))
       :errors (count (filter #(= (:failure-type %) :error) (:test-cases test)))
       :failures (count (filter #(= (:failure-type %) :failure) (:test-cases test)))
       :flakes (count (filter #(= (:failure-type %) :flake) (:test-cases test)))
@@ -242,20 +258,26 @@
       :full-class-name (:classname test)
       :package-name package)))
 
-(defn get-test-aggregations [test val]
+(defn get-test-aggregations [test val {:keys [scenarios-map]
+                                       :as options}]
   (let [map-vals      (vals val)
         map-vals-with (map #(assoc % :suite-name (:name (:attrs test))) map-vals)
-        result        (first (conj (or (:test-list test) []) (map test-data map-vals-with)))]
+        result        (first (conj (or (:test-list test) []) (map (partial test-data scenarios-map) map-vals-with)))]
     result))
 
-(defn get-another-lvl-data [multi-test-cases sample data]
+(defn get-another-lvl-data [{:keys [sample
+                                    scenarios-map]
+                             :as options}
+                            data]
   (let [content-data (if sample (keep-indexed #(if (> 20 %1) %2) (:content data)) (:content data))]
     (case (:tag data)
       :testsuite (assoc (get-attrs data) :test-list
-                                         (get-test-aggregations data (group-testcase-data (filter-tags :testcase content-data) multi-test-cases)))
+                                         (get-test-aggregations data
+                                                                (group-testcase-data (filter-tags :testcase content-data) options)
+                                                                options))
       :testsuites (assoc data :testsuite-list
                               (for [suite content-data]
-                                (get-another-lvl-data multi-test-cases sample suite)))
+                                (get-another-lvl-data options suite)))
       nil)))
 
 (defn clean-content [testsuite]
@@ -263,15 +285,15 @@
                    (assoc suite :content nil)) (:testsuite-list testsuite))]
     {:testsuite-list (filter-tags :testsuite val)}))
 
-(defn get-data [parsed-file multi-test-cases sample]
+(defn get-data [parsed-file options]
   (let [first-parsed-file (first parsed-file)]
     (if (= (:tag first-parsed-file) :testsuites)
       (->> first-parsed-file
-           (get-another-lvl-data multi-test-cases sample)
+           (get-another-lvl-data options)
            clean-content
            (into {}))
       (->> {:tag :testsuites :content parsed-file}
-           (get-another-lvl-data multi-test-cases sample)
+           (get-another-lvl-data options)
            clean-content
            (into {})))))
 
@@ -280,11 +302,10 @@
         result (reduce conj () val)]
     result))
 
-(defn get-files-data [parsed-files multi-test-cases sample]
-  (let [grouped-files  (for [file parsed-files] (get-data file multi-test-cases sample))
+(defn get-files-data [parsed-files options]
+  (let [grouped-files  (for [file parsed-files] (get-data file options))
         grouped        grouped-files
-        testsuite-list (flatten (map testset-vals grouped))
-        ]
+        testsuite-list (flatten (map testset-vals grouped))]
     testsuite-list))
 
 (defn merged-testset [testsets tests testset-name]
@@ -311,51 +332,45 @@
   (let [merge-content (merge (get grouped-files-map (:test-list parsed-content)) parsed-content)]
     merge-content))
 
-(defn get-files-path [directory]
+(defn get-files-path [directory extension]
   (let [file-seqs      (.listFiles (io/file directory))
-        filtered-files (filter (fn [file] (str/ends-with? (.getAbsolutePath file) ".xml")) file-seqs)
+        filtered-files (filter (fn [file] (str/ends-with? (.getAbsolutePath file) extension)) file-seqs)
         filtered-paths (for [file filtered-files] (.getAbsolutePath file))]
     filtered-paths))
 
 (defn parse-files [directory]
-  (let [filtered-paths (get-files-path directory)
+  (let [filtered-paths (get-files-path directory ".xml")
         files          (for [path filtered-paths] (slurp path))
         parsed-files   (for [file files] (zip-str file))]
     parsed-files))
 
-(defn merge-results [parsed-files multi-test-cases multi-testsets testset-name sample]
-  (let [grouped-data (get-files-data parsed-files multi-test-cases sample)
-        result       (if multi-testsets (merge-testsets-by-name grouped-data) (merge-testsets grouped-data testset-name))
-        ]
-    result))
+(defn merge-results [parsed-files {:keys [multitestset
+                                          testset-name]
+                                   :as options}]
+  (let [grouped-data (get-files-data parsed-files options)]
+    (if multitestset
+      (merge-testsets-by-name grouped-data)
+      (merge-testsets grouped-data testset-name))))
 
-(defn send-directory [parsed-dirs
-                      {:keys [test-case-as-pt-test-step
-                              multitestset
-                              testset-name
-                              detect-bdd-steps]
-                       :as options}
-                      sample]
-  (binding [*bdd-check* detect-bdd-steps]
-    (let [result (first
-                   (conj (list)
-                         (first
-                           (for [dir parsed-dirs]
-                             (merge-results dir test-case-as-pt-test-step multitestset testset-name sample)))))]
-      result)))
+(defn send-directory [parsed-dirs options]
+  (first
+    (conj (list)
+          (first
+            (for [dir parsed-dirs]
+              (merge-results dir options))))))
 
-(defn get-dir-by-path [path options sample]
+(defn get-dir-by-path [path options]
   (let [directory   (clojure.java.io/file path)
         parsed-dirs (for [dir (file-seq directory)] (parse-files dir))]
-    (send-directory parsed-dirs options sample)))
+    (send-directory parsed-dirs options)))
 
 (defn -main [& [arg multi-test-cases multi-testsets testset-name sample]]
   (if-not (empty? arg)
     (let [result (get-dir-by-path arg
                                   {:test-case-as-pt-test-step (= "true" multi-test-cases)
                                    :multitestset (= "true" multi-testsets)
-                                   :testset-name testset-name}
-                                  (= "true" sample))]
+                                   :testset-name testset-name
+                                   :sample (= "true" sample)})]
       result)
     (throw (Exception. "Must have at least one argument!"))))
 

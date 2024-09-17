@@ -147,16 +147,19 @@
     [new-all-tests org-xml-tests testset-id-to-name ts-id-test-name-num-instances test-id-to-cases tests-after]))
 
 (defn split-n-filter-instance-params [test pt-instance-params]
-  (into []
-        (map
-          (fn [param]
-            (string/trim param))
-          (filter not-empty
-                  (string/split
-                    (query-dsl/eval-query
-                      test
-                      (query-dsl/read-query pt-instance-params))
-                    #"\|")))))
+  (if (= "?outline-params-row" pt-instance-params)
+    ;; Special handling for BDD params - return bare row from outline example table
+    (:outline-params-row test)
+    (into []
+          (map
+            (fn [param]
+              (string/trim param))
+            (filter not-empty
+                    (string/split
+                      (query-dsl/eval-query
+                        test
+                        (query-dsl/read-query pt-instance-params))
+                      #"\|"))))))
 
 (defn create-instances [[all-tests org-xml-tests testset-id-to-name ts-id-test-name-num-instances test-id-to-cases tests-after]
                         client
@@ -223,7 +226,10 @@
                                   test-type (:test-type (:attributes (last obj-test)))
                                   params (if (= test-type "BDDTest") bdd-parameters parameters)
                                   vals (into [] (if (map? params) (vals params) params))]
-                                 (contains? test-name-param-vals (str name ":" vals))))
+                                 (if (seq parameters)
+                                   (contains? test-name-param-vals (str name ":" vals))
+                                   ;; Do not filter if no parameters is set
+                                   true)))
                              instances)
                            instances)
 
@@ -331,7 +337,7 @@
                          test-name (get tst 0)
                          params (get test-name-to-params test-name)
                          this-param  (get params index)
-                         xml-test (get group-xml-tests [test-name (or (vals this-param) [])])
+                         xml-test (get group-xml-tests [test-name (vals this-param)])
                          sys-test (get tst 1)
                          [run run-steps] (eval/sf-test-suite->run-def options (first xml-test) sys-test this-param)
                          additional-run-fields (eval/eval-additional-fields run (:additional-run-fields options))

@@ -30,6 +30,17 @@
    [nil "--detect-bdd-steps"
     "Option to try to detect BDD tests steps from output in XML files"
     :default false]
+   [nil "--features-path PATH"
+    "Path to BDD features files directory - will be used for correct BDD parsing and support. Can be provided multiple times to specify multiple directories. You can also provide multiple directories separated by comma in the same --features-path option"
+    :parse-fn #(string/split % #"\s*,\s*")
+    :validate [(fn [paths]
+                 (every? #(.exists (file %)) paths))
+               "Directory doesn't exist"]
+    :assoc-fn (fn [m k v]
+                (reduce #(update %1 k conj %2) m v))]
+   [nil "--debug"
+    "Enables debug output (a lot of output)"
+    :default false]
    [nil "--config-path PATH"
     "Path to firecracker configuration file"
     :validate [(fn [paths]

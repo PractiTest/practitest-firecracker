@@ -35,6 +35,7 @@
     (if (nil? uri)
       results
       (let [{:keys [status body]} (method uri params)]
+        (log/debug uri query-params form-params)
         (if (> attempts 0)
           (case status
             504 (do
