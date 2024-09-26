@@ -173,12 +173,37 @@
                            :has-failure? (some? status)})
                         :system-message))))))
 
+(defn- parse-specflow-step [{:keys [attrs content]
+                             :as step}]
+  (let [failure (first (filter #(= :failure (:tag %)) content))]
+    (cond->
+      {:text (:text attrs)
+       :status (:status attrs)}
+
+      (some? failure)
+      (assoc :failure-message (:message (:attrs failure))))))
+
+(defn- parse-specflow-parameter [{:keys [attrs]
+                                 :as parameter}]
+  {:name (:name attrs)
+   :value (:value attrs)})
+
+(defn- mapv-or-nil [f coll]
+  (when (seq coll)
+    (mapv f coll)))
+
 (defn- case-data [case]
   (let [content        (:content case)
         case-type      (filter #(contains? #{:error :failure :flake :skipped} (:tag %)) content)
         system-message (filter #(contains? #{:system-out :system-err} (:tag %)) content)
         attrs          (:attrs case)
-        name           (if (:classname attrs) (:name attrs) (last (str/split (:name attrs) #">")))]
+        name           (if (:classname attrs) (:name attrs) (last (str/split (:name attrs) #">")))
+
+        ;; Additional XML tags for specflow BDD output
+        specflow-steps (mapv-or-nil parse-specflow-step
+                                    (:content (first (filter #(= :steps (:tag %)) content))))
+        specflow-params (mapv-or-nil parse-specflow-parameter
+                                     (:content (first (filter #(= :parameters (:tag %)) content))))]
     (assoc attrs
       :time (str-to-number (:time attrs))
       :full-class-name (:classname attrs)
@@ -193,13 +218,43 @@
       ;; :name              name
       :test-case-name name
       :pt-test-step-name name
-      :system-message system-message)))
+      :system-message system-message
+
+      ;; Will be handled by consumers
+      :specflow-steps specflow-steps
+      :specflow-params specflow-params)))
 
 (defn group-by-classname [val]
   (last (str/split (:classname (:attrs val)) #"\.")))
 
 (defn group-by-name [val]
   (last (str/split (:name (:attrs val)) #">")))
+
+(defn- convert-specflow-status [val]
+  (case val
+    "Passed"
+    ;; Yep, nil is passed status
+    nil
+
+    "Failed"
+    :failure
+
+    "Skipped"
+    :skipped
+
+    ;; else
+    val))
+
+(defn- specflow-step->pt-step
+  [case specflow-step]
+  {:failure-detail (:failure-message specflow-step),
+   :has-failure? (some? (:failure-message specflow-step)),
+   :pt-test-step-name (:text specflow-step)
+   :full-name (str (:name case) "." (:text specflow-step))
+   :test-case-name (:text specflow-step)
+   :time 0
+   :specflow-step? true
+   :status (convert-specflow-status (:status specflow-step))})
 
 (defn group-testcase-data [data {:keys [test-case-as-pt-test-step
                                         detect-bdd-steps]
@@ -217,34 +272,81 @@
       (->> data
            (map-indexed
              (fn [index val]
-               {index (into
-                        {:test-cases (let [case (case-data val)]
-                                       ;; Expand data for steps if BDD detection is enabled
-                                       (if (and detect-bdd-steps
-                                                (:system-message case))
-                                         (or (seq (parse-bdd-output case (first (:content (first (:system-message case))))))
-                                             ;; Fallback to usual case
-                                             (list case))
-                                         (list case)))}
-                        (:attrs val))}))
+               (let [case (case-data val)
+                     specflow-steps (:specflow-steps case)
+                     specflow-params (:specflow-params case)]
+                 {index (assoc (:attrs val)
+                          :test-cases (cond
+                                        ;; We have some specflow tests steps detected in report XML - use them
+                                        (seq specflow-steps)
+                                        (map (partial specflow-step->pt-step case) specflow-steps)
+
+                                        ;; Expand data for steps if BDD detection is enabled
+                                        (and detect-bdd-steps
+                                             (:system-message case))
+                                        (or (seq (parse-bdd-output case (first (:content (first (:system-message case))))))
+                                            ;; Fallback to usual case
+                                            (list case))
+
+                                        :else
+                                        (list case))
+
+                          :parameters-map (when specflow-params
+                                            (into {} (map (juxt :name :value)) specflow-params)))})))
            (into {})))))
+
+(defn- first-and-only-one
+  [coll]
+  (let [maybe-pair (take 2 coll)]
+    ;; only 1 item in collection
+    (when (= (count maybe-pair) 1)
+      (first maybe-pair))))
 
 (defn test-data [scenarios-map test]
   (let [package (if (:classname test) (clojure.string/join "." (drop-last (str/split (:classname test) #"\."))) (:name test))
         name (if (:classname test) (last (str/split (:classname test) #"\.")) (last (str/split (:name test) #">")))
 
         ;; Lookup BDD scenario
-        gherkin-scenario (get scenarios-map [(:classname test) (:name test)])
-        ]
+        gherkin-scenario (->> (seq scenarios-map)
+                              (filter (fn [[[feature scenario params] v]]
+                                        ;; Ignore params for now
+                                        (and (= feature (:classname test))
+                                             (= scenario (:name test)))))
+                              (first)
+                              (second))
+
+        ;; We assume it's a specflow test if there's a specflow-steps param anywhere
+        specflow-test? (boolean (some :specflow-step? (:test-cases test)))
+
+        ;; We don't have feature name in specflow report, so we have to do this bit ugly lookup
+        specflow-scenario (when specflow-test?
+                            (log/debug "Assuming specflow test - doing different scenario lookup")
+
+                            (->> (seq scenarios-map)
+                                 (filter (fn [[[feature scenario] v]]
+                                           ;; Ignore feature name for now, only use scenario name
+                                           (and (= scenario (:name test))
+                                                ;; Compare params as well
+                                                (= (:map (:outline-params v)) (:parameters-map test)))))
+                                 ;; But use it only if it's exact and single match
+                                 (first-and-only-one)
+                                 ;; Return value
+                                 (second)))
+
+        bdd-scenario (or gherkin-scenario specflow-scenario)]
+
     (when (some? gherkin-scenario)
       (log/debug "Detected gherkin scenario" (:name gherkin-scenario) "for test" (:classname test) (:name test)))
 
+    (when (some? specflow-scenario)
+      (log/debug "Detected specflow scenario" (:name specflow-scenario) "for test" (:classname test) (:name test)))
+
     (assoc test
-      :bdd-test? (some? gherkin-scenario)
-      :gherkin-scenario gherkin-scenario
+      :bdd-test? (some? bdd-scenario)
+      :gherkin-scenario bdd-scenario
       ;; Extract scenario outline params to special arg (accessible via ?outline-params-row in firecracker config)
-      :outline-params-row (:row (:outline-params gherkin-scenario))
-      :outline-params-map (:map (:outline-params gherkin-scenario))
+      :outline-params-row (:row (:outline-params bdd-scenario))
+      :outline-params-map (:map (:outline-params bdd-scenario))
       :errors (count (filter #(= (:failure-type %) :error) (:test-cases test)))
       :failures (count (filter #(= (:failure-type %) :failure) (:test-cases test)))
       :flakes (count (filter #(= (:failure-type %) :flake) (:test-cases test)))

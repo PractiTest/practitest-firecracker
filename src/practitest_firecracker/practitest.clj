@@ -161,7 +161,9 @@
   (transform-rails-parameters
     (if (= "?outline-params" pt-instance-params)
       ;; Special handling for BDD params - return bare row from outline example table
-      (:outline-params-map test)
+      (or (:outline-params-map test)
+          ;; For specflow tests - use parameters map from XML report as well (if not outline is detected)
+          (:parameters-map test))
       (zipmap
         (iterate inc 1)
         (into []
