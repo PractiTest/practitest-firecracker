@@ -317,6 +317,7 @@
 
         ;; We assume it's a specflow test if there's a specflow-steps param anywhere
         specflow-test? (boolean (some :specflow-step? (:test-cases test)))
+        bdd-output? (boolean (some :bdd-line (:test-cases test)))
 
         ;; We don't have feature name in specflow report, so we have to do this bit ugly lookup
         specflow-scenario (when specflow-test?
@@ -340,6 +341,11 @@
 
     (when (some? specflow-scenario)
       (log/debug "Detected specflow scenario" (:name specflow-scenario) "for test" (:classname test) (:name test)))
+
+    (when (and bdd-output?
+               (not gherkin-scenario)
+               (not specflow-scenario))
+      (log/warn "Unable to detect BDD scenario for test" (:classname test) (:name test) " - will create FC test"))
 
     (assoc test
       :bdd-test? (some? bdd-scenario)
