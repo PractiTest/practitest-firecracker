@@ -2,7 +2,10 @@
 <!-- Use line=true here if you want to see the line of code that generated this log -->
 <configuration>
   <!-- Use shutdownHook so that we can close gracefully and finish the log drain -->
-  <shutdownHook class="ch.qos.logback.core.hook.DelayingShutdownHook"/>
+  <shutdownHook class="ch.qos.logback.core.hook.DefaultShutdownHook"/>
+
+  <!-- Stop output INFO at start -->
+  <statusListener class="ch.qos.logback.core.status.NopStatusListener" />
 
   <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
     <!-- encoders are assigned the type
