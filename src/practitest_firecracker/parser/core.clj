@@ -81,6 +81,95 @@
 (defn get-attrs [obj]
   (conj obj (:attrs obj)))
 
+(def valid-start-item #{"Given" "When" "And" "Then"})
+
+(defn- first-word [s]
+  (when s
+    (first (str/split s #"\s"))))
+
+(defn- convert-bdd-status [x]
+  (case x
+    "passed"
+    ;; Yep, nil is passed status
+    nil
+
+    "failed"
+    :failure
+
+    "skipped"
+    :skipped
+
+    ;; else
+    x))
+
+;;
+;; Some assumptions on BDD output parsing
+;; 1. Every line is a separate step
+;; 2. Valid step line should start with valid keyword
+;; 3. We try to extract status of step using some heuristics (different for behave and cucumber)
+;;
+;; Examples:
+;;
+;; Given I am logged in as Admin in Salesforce.................................passed
+;; And I delete all emails received by "automation.bas+new@openetlearning.net" in Gmail.passed
+;;
+(defn try-parse-cucumber-line
+  [line]
+  (let [status (second (re-find #"\.(passed|failed|skipped)$" line))
+        word (first-word line)
+        description (-> line
+                        (str/split #"\.(passed|failed|skipped)$")
+                        (first)
+                        ;; Trim end-of-line dots
+                        (str/replace #"\.+$" ""))]
+    (when status
+      {:status (convert-bdd-status status)
+       :time 0
+       :test-case-name word
+       :pt-test-step-name word
+       :description description
+       :full-name description})))
+
+;;
+;; Examples
+;;
+;; Given "Known" "Malware" has been set to "Block - Error Page" ... passed in 1.018s
+;; And an end user requests a "Known" DNS Exfiltration URL ... failed in 0.626s
+;;
+(defn try-parse-behave-line
+  [line]
+  (let [[match status time] (re-find #"\.\.\. (passed|failed|skipped) in ([\d\.]+)s$" line)
+        word (first-word line)
+        description (-> line
+                        (str/split #"\.\.\. (passed|failed|skipped) in ([\d\.]+)s$")
+                        (first)
+                        (str/trim))]
+    (when status
+      {:status (convert-bdd-status status)
+       :time (str-to-number time)
+       :test-case-name word
+       :pt-test-step-name word
+       :full-name description
+       :description description})))
+
+(defn parse-bdd-output [case system-out]
+  (->> (for [line (str/split-lines system-out)
+             :let [trimmed (str/trim line)]
+             :when (some #(str/starts-with? trimmed %) valid-start-item)]
+         ;; try to parse both as behave and cucumber (they are mutually exclusive)
+         (or (try-parse-behave-line trimmed)
+             (try-parse-cucumber-line trimmed)))
+       (remove nil?)
+       (map (fn [{:keys [status] :as bdd-test-case}]
+              ;; Merge other data (required for further processing)
+              (dissoc (merge
+                       case
+                       bdd-test-case
+                       {:failure-type status
+                        :has-failure? (some? status)})
+                      :failure-detail
+                      :system-message)))))
+
 (defn case-data [case]
   (let [content        (:content case)
         case-type      (filter #(contains? #{:error :failure :flake :skipped} (:tag %)) content)
@@ -103,8 +192,17 @@
       :pt-test-step-name name
       :system-message system-message)))
 
+(def ^:dynamic *bdd-check* false)
+
 (defn get-case-info [test-cases]
-  (map case-data test-cases))
+  (if *bdd-check*
+    (mapcat (fn [case]
+              (if (:system-message case)
+                (or (seq (parse-bdd-output case (first (:content (first (:system-message case))))))
+                    [case])
+                [case]))
+            (map case-data test-cases))
+    (map case-data test-cases)))
 
 (defn group-by-classname [val]
   (last (str/split (:classname (:attrs val)) #"\.")))
@@ -231,22 +329,33 @@
         ]
     result))
 
-(defn send-directory [parsed-dirs multi-test-cases multi-testsets testset-name sample]
-  (let [result (first
-                 (conj (list)
-                       (first
-                         (for [dir parsed-dirs]
-                           (merge-results dir multi-test-cases multi-testsets testset-name sample)))))]
-    result))
+(defn send-directory [parsed-dirs
+                      {:keys [test-case-as-pt-test-step
+                              multitestset
+                              testset-name
+                              detect-bdd-steps]
+                       :as options}
+                      sample]
+  (binding [*bdd-check* detect-bdd-steps]
+    (let [result (first
+                   (conj (list)
+                         (first
+                           (for [dir parsed-dirs]
+                             (merge-results dir test-case-as-pt-test-step multitestset testset-name sample)))))]
+      result)))
 
-(defn get-dir-by-path [path multi-test-cases multi-testsets testset-name sample]
+(defn get-dir-by-path [path options sample]
   (let [directory   (clojure.java.io/file path)
         parsed-dirs (for [dir (file-seq directory)] (parse-files dir))]
-    (send-directory parsed-dirs multi-test-cases multi-testsets testset-name sample)))
+    (send-directory parsed-dirs options sample)))
 
 (defn -main [& [arg multi-test-cases multi-testsets testset-name sample]]
   (if-not (empty? arg)
-    (let [result (get-dir-by-path arg (= "true" multi-test-cases) (= "true" multi-testsets) testset-name (= "true" sample))]
+    (let [result (get-dir-by-path arg
+                                  {:test-case-as-pt-test-step (= "true" multi-test-cases)
+                                   :multitestset (= "true" multi-testsets)
+                                   :testset-name testset-name}
+                                  (= "true" sample))]
       result)
     (throw (Exception. "Must have at least one argument!"))))
 

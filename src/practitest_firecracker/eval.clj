@@ -132,10 +132,22 @@
                        nil "PASSED"
                        "NO RUN")}))
 
+(defn bdd-test-case->run-step-def [test-case]
+  {:name (:pt-test-step-name test-case)
+   :description (:description test-case)
+   :status (case (:status test-case)
+             :failure "FAILED"
+             :skipped "N/A"
+             :error "FAILED"
+             nil "PASSED"
+             "NO RUN")})
+
 (defn sf-test-suite->run-def [options test-suite sys-test params]
   [{:run-duration (:time-elapsed sys-test)}
-   (map (partial sf-test-case->run-step-def options params (:test-cases test-suite))
-        (sort-by :position (:test-cases sys-test)))])
+   (if (:detect-bdd-steps options)
+     (map bdd-test-case->run-step-def (:test-cases test-suite))
+     (map (partial sf-test-case->run-step-def options params (:test-cases test-suite))
+          (sort-by :position (:test-cases sys-test))))])
 
 (defn sf-test-run->run-def [custom-fields run-duration]
   {:run-duration  (:time-elapsed run-duration),

@@ -27,6 +27,9 @@
    [nil "--temp-folder PATH"
     "Folder to contain parsed xmls, for each reports-path folder."
     :default "tmp"]
+   [nil "--detect-bdd-steps"
+    "Option to try to detect BDD tests steps from output in XML files"
+    :default false]
    [nil "--config-path PATH"
     "Path to firecracker configuration file"
     :validate [(fn [paths]
