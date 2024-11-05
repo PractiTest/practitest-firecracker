@@ -4,7 +4,9 @@
             [clojure.tools.logging :as log]
             [lambdaisland.cucumber.gherkin :as gherkin]
             [lambdaisland.cucumber.jvm :as jvm])
-  (:import (java.io BufferedReader StringReader)))
+  (:import (cucumber.runtime.io Resource)
+           (java.io BufferedReader ByteArrayInputStream File FileInputStream InputStream StringBufferInputStream StringReader)
+           (java.nio.charset Charset StandardCharsets)))
 
 (defn- glue-example-arguments
   "Turns example table into vector of maps - args associated with values"
@@ -44,14 +46,13 @@
           [
            ;; 1 - simple substitution
            ;; e.g:
-           [[(:name feature) expanded-name] result]
+           [[(:name feature) expanded-name (:map param)] result]
 
            ;; 2 - glued as this <bare name> #1.<index>: <subst name>
            ;; e.g: BAS.3.02.06 - Configure a Quote with Docebo Elevate Bundle - NB &lt;Opportunity Name&gt; - #1.1: BAS.3.02.06 - Configure a Quote with Docebo Elevate Bundle - NB $AT-NB-Dis-GT30-ARR-LTE75-Elevate
            [[(:name feature)
-             (str (:name scenario) " - #1." (inc (:index param)) ": " expanded-name)] result]
-
-           ]))
+             (str (:name scenario) " - #1." (inc (:index param)) ": " expanded-name)
+             (:map param)] result]]))
          all-params)))
 
 ;; TODO: tags support ??
@@ -92,12 +93,15 @@
 
 (comment
   ;; Scenario lookup map is a map with keys that looks like
-  ["feature name" "scenario name"]
+  ["feature name" "scenario name" {"param" "value"}]
 
   ;; Scenario outlines get expanded so they will end with multiple keys
-  ["feature name" "scenario outline <arg>"]
-  ["feature name" "scenario outline \"val1\""]
-  ["feature name" "scenario outline \"val2\""]
+  ["feature name" "scenario outline <arg>" {}]
+  ["feature name" "scenario outline \"val1\"" {"arg" "val1"}]
+  ["feature name" "scenario outline \"val2\"" {"arg" "val2"}]
+
+  ["feature name" "scenario outline no substitutions" {"arg" "val1"}]
+  ["feature name" "scenario outline no substitutions" {"arg" "val2"}]
   ;; etc - all pointing to the same scenario object
   )
 
@@ -112,20 +116,44 @@
                             ;; Extract scenario sources from feature file
                             scenario (assoc scenario :scenario-source
                                                      (extract-scenario-source feature-root scenario))
-                            ;; We always will have feature + scenario key
-                            head [[feature-name (:name scenario)] scenario]]
+                            ;; We always will have feature + scenario key + nil (no params)
+                            head [[feature-name (:name scenario) nil] scenario]]
                         ;; For outlines - expand scenarios and link them to original one
                         (if (= :gherkin/scenario-outline (:type scenario))
                           (cons head (expand-scenario-outline scenario feature))
                           [head]))))
             (:children feature)))))
 
+(defn- strip-zwnbsp
+  "Provided example specflow + playwright feature file have
+  ZWNBSP character at the start of file which breaks gherkin parser.
+
+  We're removing it here if it's present"
+  [file]
+  (let [data (slurp (io/file file))]
+    (str/replace data "\uFEFF" "")))
+
+;; Override file contents with string
+(defn- string-from-file-resource ^Resource [^File file ^String data]
+  (reify
+    Resource
+    (getPath ^String [_]
+      (.getPath file))
+    (getInputStream ^InputStream [_]
+      (ByteArrayInputStream. (.getBytes data StandardCharsets/UTF_8)))
+
+    Object
+    (toString [_]
+      (str "<string-from-file-resource: file=" file ">"))))
+
 (defn- parse-gherkin-feature
   [file]
   (log/debug "Parsing gherkin feature file" file)
   (try
     (->> file
-         jvm/parse
+         strip-zwnbsp
+         (string-from-file-resource (io/file file))
+         jvm/parse-resource
          gherkin/gherkin->edn)
     (catch Exception e
       (log/warn e "Error parsing feature file - scenario will not be used in detection"))))
