@@ -5,7 +5,7 @@
     [throttler.core :refer [fn-throttler]]
     [clojure.tools.logging :as log]
     [practitest-firecracker.const :refer :all]
-    [practitest-firecracker.utils :refer [exit group-errors pformat]]))
+    [practitest-firecracker.utils :refer [exit group-errors pformat transform-keys]]))
 
 (def backoff-timeout "Backoff timeout in seconds" 20)
 (def max-attempts "Number of attempts to run" 10)
@@ -35,6 +35,7 @@
     (if (nil? uri)
       results
       (let [{:keys [status body]} (method uri params)]
+        (log/debug uri query-params form-params)
         (if (> attempts 0)
           (case status
             504 (do
@@ -110,7 +111,8 @@
       {:type       "instances"
        :attributes {:set-id     testset-id
                     :test-id    (first test-id-num)
-                    :parameters (get (get testname-to-params (get test-id-testname (first test-id-num))) index)}}))
+                    :parameters (transform-keys (get (get testname-to-params (get test-id-testname (first test-id-num))) index)
+                                                name)}}))
 
 (defn has-duplicates? [key runs]
   (let [grouped (group-by key (into [] runs))]

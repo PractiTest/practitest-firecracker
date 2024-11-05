@@ -2,6 +2,7 @@
   (:require
     [clojure.java.io :as io]
     [clojure.string :as str]
+    [clojure.tools.logging :as log]
     [clojure.xml :as xml]
     [clojure.zip :as zip])
   (:import
@@ -126,6 +127,7 @@
       {:status (convert-bdd-status status)
        :time 0
        :test-case-name word
+       :bdd-line line
        :pt-test-step-name word
        :description description
        :full-name description})))
@@ -148,34 +150,60 @@
       {:status (convert-bdd-status status)
        :time (str-to-number time)
        :test-case-name word
+       :bdd-line line
        :pt-test-step-name word
        :full-name description
        :description description})))
 
 (defn parse-bdd-output [case system-out]
-  (->> (for [line (str/split-lines system-out)
-             :let [trimmed (str/trim line)]
-             :when (some #(str/starts-with? trimmed %) valid-start-item)]
-         ;; try to parse both as behave and cucumber (they are mutually exclusive)
-         (or (try-parse-behave-line trimmed)
-             (try-parse-cucumber-line trimmed)))
-       (remove nil?)
-       (map (fn [{:keys [status] :as bdd-test-case}]
-              ;; Merge other data (required for further processing)
-              (dissoc (merge
-                       case
-                       bdd-test-case
-                       {:failure-type status
-                        :has-failure? (some? status)})
-                      :failure-detail
-                      :system-message)))))
+  (when system-out
+    (->> (for [line (str/split-lines system-out)
+               :let [trimmed (str/trim line)]
+               :when (some #(str/starts-with? trimmed %) valid-start-item)]
+           ;; try to parse both as behave and cucumber (they are mutually exclusive)
+           (or (try-parse-behave-line trimmed)
+               (try-parse-cucumber-line trimmed)))
+         (remove nil?)
+         (map (fn [{:keys [status] :as bdd-test-case}]
+                ;; Merge other data (required for further processing)
+                (dissoc (merge
+                          case
+                          bdd-test-case
+                          {:failure-type status
+                           :has-failure? (some? status)})
+                        :system-message))))))
 
-(defn case-data [case]
+(defn- parse-specflow-step [{:keys [attrs content]
+                             :as step}]
+  (let [failure (first (filter #(= :failure (:tag %)) content))]
+    (cond->
+      {:text (:text attrs)
+       :status (:status attrs)}
+
+      (some? failure)
+      (assoc :failure-message (:message (:attrs failure))))))
+
+(defn- parse-specflow-parameter [{:keys [attrs]
+                                 :as parameter}]
+  {:name (:name attrs)
+   :value (:value attrs)})
+
+(defn- mapv-or-nil [f coll]
+  (when (seq coll)
+    (mapv f coll)))
+
+(defn- case-data [case]
   (let [content        (:content case)
         case-type      (filter #(contains? #{:error :failure :flake :skipped} (:tag %)) content)
         system-message (filter #(contains? #{:system-out :system-err} (:tag %)) content)
         attrs          (:attrs case)
-        name           (if (:classname attrs) (:name attrs) (last (str/split (:name attrs) #">")))]
+        name           (if (:classname attrs) (:name attrs) (last (str/split (:name attrs) #">")))
+
+        ;; Additional XML tags for specflow BDD output
+        specflow-steps (mapv-or-nil parse-specflow-step
+                                    (:content (first (filter #(= :steps (:tag %)) content))))
+        specflow-params (mapv-or-nil parse-specflow-parameter
+                                     (:content (first (filter #(= :parameters (:tag %)) content))))]
     (assoc attrs
       :time (str-to-number (:time attrs))
       :full-class-name (:classname attrs)
@@ -190,19 +218,11 @@
       ;; :name              name
       :test-case-name name
       :pt-test-step-name name
-      :system-message system-message)))
+      :system-message system-message
 
-(def ^:dynamic *bdd-check* false)
-
-(defn get-case-info [test-cases]
-  (if *bdd-check*
-    (mapcat (fn [case]
-              (if (:system-message case)
-                (or (seq (parse-bdd-output case (first (:content (first (:system-message case))))))
-                    [case])
-                [case]))
-            (map case-data test-cases))
-    (map case-data test-cases)))
+      ;; Will be handled by consumers
+      :specflow-steps specflow-steps
+      :specflow-params specflow-params)))
 
 (defn group-by-classname [val]
   (last (str/split (:classname (:attrs val)) #"\.")))
@@ -210,23 +230,129 @@
 (defn group-by-name [val]
   (last (str/split (:name (:attrs val)) #">")))
 
-(defn group-testcase-data [data multi-test-cases]
+(defn- convert-specflow-status [val]
+  (case val
+    "Passed"
+    ;; Yep, nil is passed status
+    nil
+
+    "Failed"
+    :failure
+
+    "Skipped"
+    :skipped
+
+    ;; else
+    val))
+
+(defn- specflow-step->pt-step
+  [case specflow-step]
+  {:failure-detail (:failure-message specflow-step),
+   :has-failure? (some? (:failure-message specflow-step)),
+   :pt-test-step-name (:text specflow-step)
+   :full-name (str (:name case) "." (:text specflow-step))
+   :test-case-name (:text specflow-step)
+   :time 0
+   :specflow-step? true
+   :status (convert-specflow-status (:status specflow-step))})
+
+(defn group-testcase-data [data {:keys [test-case-as-pt-test-step
+                                        detect-bdd-steps]
+                                 :as options}]
   (let [grouping-func (if (contains? (:attrs (first data)) :classname)
                         group-by-classname
                         group-by-name)]
-    (if multi-test-cases
+    (if test-case-as-pt-test-step
       (->> data
            (group-by grouping-func)
-           (map (fn [[k vals]] [k (into {:test-cases (get-case-info vals)} (first (map :attrs vals)))]))
+           (map
+             (fn [[k vals]]
+               [k (into {:test-cases (map case-data vals)} (first (map :attrs vals)))]))
            (into {}))
       (->> data
-           (map-indexed (fn [index val] {index (into {:test-cases (list (case-data val))} (:attrs val))}))
+           (map-indexed
+             (fn [index val]
+               (let [case (case-data val)
+                     specflow-steps (:specflow-steps case)
+                     specflow-params (:specflow-params case)]
+                 {index (assoc (:attrs val)
+                          :test-cases (cond
+                                        ;; We have some specflow tests steps detected in report XML - use them
+                                        (seq specflow-steps)
+                                        (map (partial specflow-step->pt-step case) specflow-steps)
+
+                                        ;; Expand data for steps if BDD detection is enabled
+                                        (and detect-bdd-steps
+                                             (:system-message case))
+                                        (or (seq (parse-bdd-output case (first (:content (first (:system-message case))))))
+                                            ;; Fallback to usual case
+                                            (list case))
+
+                                        :else
+                                        (list case))
+
+                          :parameters-map (when specflow-params
+                                            (into {} (map (juxt :name :value)) specflow-params)))})))
            (into {})))))
 
-(defn test-data [test]
+(defn- first-and-only-one
+  [coll]
+  (let [maybe-pair (take 2 coll)]
+    ;; only 1 item in collection
+    (when (= (count maybe-pair) 1)
+      (first maybe-pair))))
+
+(defn test-data [scenarios-map test]
   (let [package (if (:classname test) (clojure.string/join "." (drop-last (str/split (:classname test) #"\."))) (:name test))
-        name    (if (:classname test) (last (str/split (:classname test) #"\.")) (last (str/split (:name test) #">")))]
+        name (if (:classname test) (last (str/split (:classname test) #"\.")) (last (str/split (:name test) #">")))
+
+        ;; Lookup BDD scenario
+        gherkin-scenario (->> (seq scenarios-map)
+                              (filter (fn [[[feature scenario params] v]]
+                                        ;; Ignore params for now
+                                        (and (= feature (:classname test))
+                                             (= scenario (:name test)))))
+                              (first)
+                              (second))
+
+        ;; We assume it's a specflow test if there's a specflow-steps param anywhere
+        specflow-test? (boolean (some :specflow-step? (:test-cases test)))
+        bdd-output? (boolean (some :bdd-line (:test-cases test)))
+
+        ;; We don't have feature name in specflow report, so we have to do this bit ugly lookup
+        specflow-scenario (when specflow-test?
+                            (log/debug "Assuming specflow test - doing different scenario lookup")
+
+                            (->> (seq scenarios-map)
+                                 (filter (fn [[[feature scenario] v]]
+                                           ;; Ignore feature name for now, only use scenario name
+                                           (and (= scenario (:name test))
+                                                ;; Compare params as well
+                                                (= (:map (:outline-params v)) (:parameters-map test)))))
+                                 ;; But use it only if it's exact and single match
+                                 (first-and-only-one)
+                                 ;; Return value
+                                 (second)))
+
+        bdd-scenario (or gherkin-scenario specflow-scenario)]
+
+    (when (some? gherkin-scenario)
+      (log/debug "Detected gherkin scenario" (:name gherkin-scenario) "for test" (:classname test) (:name test)))
+
+    (when (some? specflow-scenario)
+      (log/debug "Detected specflow scenario" (:name specflow-scenario) "for test" (:classname test) (:name test)))
+
+    (when (and bdd-output?
+               (not gherkin-scenario)
+               (not specflow-scenario))
+      (log/warn "Unable to detect BDD scenario for test" (:classname test) (:name test) " - will create FC test"))
+
     (assoc test
+      :bdd-test? (some? bdd-scenario)
+      :gherkin-scenario bdd-scenario
+      ;; Extract scenario outline params to special arg (accessible via ?outline-params-row in firecracker config)
+      :outline-params-row (:row (:outline-params bdd-scenario))
+      :outline-params-map (:map (:outline-params bdd-scenario))
       :errors (count (filter #(= (:failure-type %) :error) (:test-cases test)))
       :failures (count (filter #(= (:failure-type %) :failure) (:test-cases test)))
       :flakes (count (filter #(= (:failure-type %) :flake) (:test-cases test)))
@@ -242,20 +368,26 @@
       :full-class-name (:classname test)
       :package-name package)))
 
-(defn get-test-aggregations [test val]
+(defn get-test-aggregations [test val {:keys [scenarios-map]
+                                       :as options}]
   (let [map-vals      (vals val)
         map-vals-with (map #(assoc % :suite-name (:name (:attrs test))) map-vals)
-        result        (first (conj (or (:test-list test) []) (map test-data map-vals-with)))]
+        result        (first (conj (or (:test-list test) []) (map (partial test-data scenarios-map) map-vals-with)))]
     result))
 
-(defn get-another-lvl-data [multi-test-cases sample data]
+(defn get-another-lvl-data [{:keys [sample
+                                    scenarios-map]
+                             :as options}
+                            data]
   (let [content-data (if sample (keep-indexed #(if (> 20 %1) %2) (:content data)) (:content data))]
     (case (:tag data)
       :testsuite (assoc (get-attrs data) :test-list
-                                         (get-test-aggregations data (group-testcase-data (filter-tags :testcase content-data) multi-test-cases)))
+                                         (get-test-aggregations data
+                                                                (group-testcase-data (filter-tags :testcase content-data) options)
+                                                                options))
       :testsuites (assoc data :testsuite-list
                               (for [suite content-data]
-                                (get-another-lvl-data multi-test-cases sample suite)))
+                                (get-another-lvl-data options suite)))
       nil)))
 
 (defn clean-content [testsuite]
@@ -263,15 +395,15 @@
                    (assoc suite :content nil)) (:testsuite-list testsuite))]
     {:testsuite-list (filter-tags :testsuite val)}))
 
-(defn get-data [parsed-file multi-test-cases sample]
+(defn get-data [parsed-file options]
   (let [first-parsed-file (first parsed-file)]
     (if (= (:tag first-parsed-file) :testsuites)
       (->> first-parsed-file
-           (get-another-lvl-data multi-test-cases sample)
+           (get-another-lvl-data options)
            clean-content
            (into {}))
       (->> {:tag :testsuites :content parsed-file}
-           (get-another-lvl-data multi-test-cases sample)
+           (get-another-lvl-data options)
            clean-content
            (into {})))))
 
@@ -280,11 +412,10 @@
         result (reduce conj () val)]
     result))
 
-(defn get-files-data [parsed-files multi-test-cases sample]
-  (let [grouped-files  (for [file parsed-files] (get-data file multi-test-cases sample))
+(defn get-files-data [parsed-files options]
+  (let [grouped-files  (for [file parsed-files] (get-data file options))
         grouped        grouped-files
-        testsuite-list (flatten (map testset-vals grouped))
-        ]
+        testsuite-list (flatten (map testset-vals grouped))]
     testsuite-list))
 
 (defn merged-testset [testsets tests testset-name]
@@ -311,51 +442,45 @@
   (let [merge-content (merge (get grouped-files-map (:test-list parsed-content)) parsed-content)]
     merge-content))
 
-(defn get-files-path [directory]
+(defn get-files-path [directory extension]
   (let [file-seqs      (.listFiles (io/file directory))
-        filtered-files (filter (fn [file] (str/ends-with? (.getAbsolutePath file) ".xml")) file-seqs)
+        filtered-files (filter (fn [file] (str/ends-with? (.getAbsolutePath file) extension)) file-seqs)
         filtered-paths (for [file filtered-files] (.getAbsolutePath file))]
     filtered-paths))
 
 (defn parse-files [directory]
-  (let [filtered-paths (get-files-path directory)
+  (let [filtered-paths (get-files-path directory ".xml")
         files          (for [path filtered-paths] (slurp path))
         parsed-files   (for [file files] (zip-str file))]
     parsed-files))
 
-(defn merge-results [parsed-files multi-test-cases multi-testsets testset-name sample]
-  (let [grouped-data (get-files-data parsed-files multi-test-cases sample)
-        result       (if multi-testsets (merge-testsets-by-name grouped-data) (merge-testsets grouped-data testset-name))
-        ]
-    result))
+(defn merge-results [parsed-files {:keys [multitestset
+                                          testset-name]
+                                   :as options}]
+  (let [grouped-data (get-files-data parsed-files options)]
+    (if multitestset
+      (merge-testsets-by-name grouped-data)
+      (merge-testsets grouped-data testset-name))))
 
-(defn send-directory [parsed-dirs
-                      {:keys [test-case-as-pt-test-step
-                              multitestset
-                              testset-name
-                              detect-bdd-steps]
-                       :as options}
-                      sample]
-  (binding [*bdd-check* detect-bdd-steps]
-    (let [result (first
-                   (conj (list)
-                         (first
-                           (for [dir parsed-dirs]
-                             (merge-results dir test-case-as-pt-test-step multitestset testset-name sample)))))]
-      result)))
+(defn send-directory [parsed-dirs options]
+  (first
+    (conj (list)
+          (first
+            (for [dir parsed-dirs]
+              (merge-results dir options))))))
 
-(defn get-dir-by-path [path options sample]
+(defn get-dir-by-path [path options]
   (let [directory   (clojure.java.io/file path)
         parsed-dirs (for [dir (file-seq directory)] (parse-files dir))]
-    (send-directory parsed-dirs options sample)))
+    (send-directory parsed-dirs options)))
 
 (defn -main [& [arg multi-test-cases multi-testsets testset-name sample]]
   (if-not (empty? arg)
     (let [result (get-dir-by-path arg
                                   {:test-case-as-pt-test-step (= "true" multi-test-cases)
                                    :multitestset (= "true" multi-testsets)
-                                   :testset-name testset-name}
-                                  (= "true" sample))]
+                                   :testset-name testset-name
+                                   :sample (= "true" sample)})]
       result)
     (throw (Exception. "Must have at least one argument!"))))
 

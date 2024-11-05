@@ -14,8 +14,11 @@
             additional-fields))
 
 (defn sf-test-suite->pt-test-name [options suite]
-  (let [test-name (eval-query suite (:pt-test-name options))]
-    (if (string/blank? test-name) "UNNAMED" test-name)))
+  ;; Special case for automatically detected BDD scenarios - will use outline name instead of generated one
+  (if-let [scenario (:gherkin-scenario suite)]
+    (:name scenario)
+    (let [test-name (eval-query suite (:pt-test-name options))]
+      (if (string/blank? test-name) "UNNAMED" test-name))))
 
 (defn sf-test-case->pt-step-description [options test-case]
   (let [step-name (eval-query test-case (:pt-test-step-description options))]
@@ -30,8 +33,17 @@
    :description (sf-test-case->pt-step-description options test-case)})
 
 (defn sf-test-suite->test-def [options test-suite]
-  [{:name (sf-test-suite->pt-test-name options test-suite)}
-   (map (partial sf-test-case->step-def options) (:test-cases test-suite))])
+  (if (:bdd-test? test-suite)
+    ;; Special logic for BDD tests
+    [{:name (sf-test-suite->pt-test-name options test-suite)
+      :test-type "BDDTest"
+      ;; Attach scenario source
+      :scenario (:scenario-source (:gherkin-scenario test-suite))}
+     ;; No steps for BDD
+     []]
+    ;; Usual logic
+    [{:name (sf-test-suite->pt-test-name options test-suite)}
+     (map (partial sf-test-case->step-def options) (:test-cases test-suite))]))
 
 (defn group-test-names [tests options]
   (doall (for [test tests]
@@ -135,6 +147,9 @@
 (defn bdd-test-case->run-step-def [test-case]
   {:name (:pt-test-step-name test-case)
    :description (:description test-case)
+   ;; Include actual results for failure and error cases
+   :actual-results (when (#{:failure :error} (:status test-case))
+                     (:failure-detail test-case))
    :status (case (:status test-case)
              :failure "FAILED"
              :skipped "N/A"

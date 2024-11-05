@@ -17,6 +17,8 @@
   (clean nil)
   (b/copy-dir {:src-dirs ["src"]
                :target-dir class-dir})
+  (b/copy-dir {:src-dirs ["resources"]
+               :target-dir class-dir})
   (b/compile-clj {:basis @basis
                   :ns-compile '[practitest-firecracker.core]
                   :class-dir class-dir})

@@ -44,3 +44,12 @@
 (defn replace-keys [params]
   (when params
     (into {} (map (fn [[x y]] {(when x (str "<" (if (keyword? x) (name x) x) ">")) y}) params))))
+
+(defn transform-keys
+  [m f & args]
+  (when m
+    (reduce-kv
+      (fn [a k v]
+        (assoc a (apply f k args) v))
+      {}
+      m)))
