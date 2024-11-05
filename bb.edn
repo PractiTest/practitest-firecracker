@@ -3,5 +3,7 @@
        :task (clojure "-M:dev")}
   release {:doc "Build uberjar"
            :task (clojure "-T:build uber")}
+  outdated {:doc  "Show outdated dependencies"
+            :task (clojure {:continue true} "-Tantq outdated")}
   watson {:doc "Use clj-watson to check for vulnerabilities. You have to have clj-watson installed as Clojure CLI tool and your NVD API Key set as environment variable when running this task. See https://github.com/clj-holmes/clj-watson for more information."
           :task (clojure "-Tclj-watson scan :p deps.edn")}}}
