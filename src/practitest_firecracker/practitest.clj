@@ -213,9 +213,10 @@
                                      (fn [[key tests]]
                                        {key
                                         (into []
-                                              (map
-                                                (fn [test]
-                                                  (get-parameters-map test pt-instance-params)) tests))})
+                                              (remove nil?
+                                                      (map
+                                                        (fn [test]
+                                                          (get-parameters-map test pt-instance-params)) tests)))})
                                      (group-by
                                        #(eval/sf-test-suite->pt-test-name options %)
                                        org-xml-tests))))
@@ -284,47 +285,16 @@
                                         (get-in inst [:attributes :name]))
                                       filter-instances))))
 
-        test-name-to-params (into {}
-                      (map
-                        (fn [test-name]
-                          (reduce (fn [a b]
-                                    (if (= (keys a) (keys b))
-                                      {(first (keys a))
-                                       (into [] (conj
-                                                  (if (vector? (first (vals a)))
-                                                    (first (vals a))
-                                                    (into [] (vals a)))
-                                                  (first (vals b))))}
-                                      (conj a b)))
-                                  {}
-                                  (map (fn [x]
-                                         {test-name
-                                          (into {}
-                                                (map (fn [y]
-                                                       (let [fy (first y)]
-                                                         {(if (contains? existing-instance test-name)
-                                                            fy
-                                                            (if (keyword? fy)
-                                                              fy
-                                                              (keyword (str fy))))
-                                                          (last y)}))
-                                                     x))})
-                                       (if (contains? existing-instance test-name)
-                                         (get existing-instance test-name)
-                                         (get testname-to-params test-name)))))
-                        (keys testname-to-params)))
-
         new-testname-to-params (into {}
                                      (map
                                        (fn [test-name]
                                          {test-name
                                           (into []
                                                 (difference
-                                                  (set (get test-name-to-params test-name))
+                                                  (set (get testname-to-params test-name))
                                                   (set (get existing-instance test-name))))})
-                                       (keys test-name-to-params)))
-
-        tests-with-steps (update-steps all-tests test-id-to-cases test-name-to-params options)
+                                       (keys testname-to-params)))
+        tests-with-steps (update-steps all-tests test-id-to-cases testname-to-params options)
         all-tests (concat tests-after tests-with-steps)
         make-instances (flatten (api/make-instances missing-instances new-testname-to-params test-id-testname))
         test-by-id (group-by (fn [test] (read-string (:id (last test)))) all-tests)
@@ -343,7 +313,7 @@
 
         instance-to-ts-test (group-by (fn [inst] [(:set-id (:attributes inst)) (:test-id (:attributes inst))]) all-intstances)]
     (when display-run-time (print-run-time "Time - after create instances: %d:%d:%d" start-time))
-    [test-by-id instance-to-ts-test test-name-to-params group-xml-tests]))
+    [test-by-id instance-to-ts-test testname-to-params group-xml-tests]))
 
 (defn make-runs [[test-by-id instance-to-ts-test test-name-to-params group-xml-tests] client {:keys [display-action-logs] :as options} start-time]
   (when display-action-logs (log/infof "make-runs"))
