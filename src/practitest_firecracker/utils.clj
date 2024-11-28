@@ -55,11 +55,9 @@
       {}
       m)))
 
-(let [version-holder (atom nil)]
-  (defn get-current-version []
-    (if-let [cached-version @version-holder]
-      cached-version
-      (let [version (if-let [version-file (io/resource "practitest_firecracker/firecracker_version.txt")]
-                      (slurp version-file)
-                      "2.0-Devel")]
-        (reset! version-holder version)))))
+(defn- get-current-version* []
+  (if-let [version-file (io/resource "practitest_firecracker/firecracker_version.txt")]
+    (slurp version-file)
+    "2.0-Devel"))
+
+(def get-current-version (memoize get-current-version*))
