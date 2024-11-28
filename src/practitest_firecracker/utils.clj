@@ -1,6 +1,7 @@
 (ns practitest-firecracker.utils
   (:require
     [clj-time.core :as t]
+    [clojure.java.io :as io]
     [clojure.pprint :as pprint]
     [clojure.string :as string]
     [cheshire.core :as json]))
@@ -53,3 +54,12 @@
         (assoc a (apply f k args) v))
       {}
       m)))
+
+(let [version-holder (atom nil)]
+  (defn get-current-version []
+    (if-let [cached-version @version-holder]
+      cached-version
+      (let [version (if-let [version-file (io/resource "practitest_firecracker/firecracker_version.txt")]
+                      (slurp version-file)
+                      "2.0-Devel")]
+        (reset! version-holder version)))))

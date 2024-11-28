@@ -10,12 +10,11 @@
    [practitest-firecracker.parser.core :refer [send-directory parse-files]]
    [practitest-firecracker.parser.gherkin :as gherkin]
    [practitest-firecracker.api         :refer [make-client]]
-   [practitest-firecracker.utils       :refer [exit]]
+   [practitest-firecracker.utils       :refer [exit get-current-version]]
    [clojure.pprint                     :as     pprint]
    [clojure.java.io                    :as     io]
    [clj-time.core                      :as     t]
-   [clojure.tools.logging              :as log]
-   [practitest-firecracker.const       :refer [fc-version]])
+   [clojure.tools.logging              :as     log])
   (:import (org.slf4j LoggerFactory)
            (ch.qos.logback.classic Level Logger))
   (:gen-class))
@@ -74,11 +73,11 @@
               (pprint/pprint {"=============== args: ===============" args}))
 
             "version"
-            (log/info "Version: " fc-version)
+            (log/info "Version:" (get-current-version))
 
             "create-and-populate-testset"
             (do
-              (log/info "Start Running Firecracker, Version: " fc-version)
+              (log/info "Start Running Firecracker, Version: " (get-current-version))
               (timef
                "create-and-populate-testset"
                (-> (create-testsets client options additional-reports)

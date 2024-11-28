@@ -1,5 +1,6 @@
 (ns build
   (:require
+    [clojure.java.io :as io]
     [clojure.tools.build.api :as b]))
 
 (def lib 'practitest/practitest-firecracker)
@@ -32,7 +33,10 @@
                   :ns-compile '[practitest-firecracker.core]
                   :class-dir class-dir})
   (println "Packing JAR file")
+  (spit (io/file class-dir "practitest_firecracker" "firecracker_version.txt")
+        version)
   (b/uber {:class-dir class-dir
            :uber-file uber-file
            :basis @basis
+           :manifest {"Implementation-Version" version}
            :main 'practitest-firecracker.core}))

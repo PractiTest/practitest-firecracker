@@ -5,7 +5,7 @@
     [throttler.core :refer [fn-throttler]]
     [clojure.tools.logging :as log]
     [practitest-firecracker.const :refer :all]
-    [practitest-firecracker.utils :refer [exit group-errors pformat transform-keys]]))
+    [practitest-firecracker.utils :refer [exit group-errors pformat transform-keys get-current-version]]))
 
 (def backoff-timeout "Backoff timeout in seconds" 20)
 (def max-attempts "Number of attempts to run" 10)
@@ -30,8 +30,8 @@
          params (cond-> {:basic-auth       credentials
                          :throw-exceptions false
                          :as               :json}
-                        query-params (assoc :query-params (conj query-params {:source "firecracker" :firecracker-version fc-version}))
-                        form-params (assoc :form-params (conj form-params {:source "firecracker" :firecracker-version fc-version}) :content-type :json))]
+                        query-params (assoc :query-params (conj query-params {:source "firecracker" :firecracker-version (get-current-version)}))
+                        form-params (assoc :form-params (conj form-params {:source "firecracker" :firecracker-version (get-current-version)}) :content-type :json))]
     (if (nil? uri)
       results
       (let [{:keys [status body]} (method uri params)]
