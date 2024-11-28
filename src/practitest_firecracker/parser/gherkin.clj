@@ -51,7 +51,10 @@
            ;; 2 - glued as this <bare name> #1.<index>: <subst name>
            ;; e.g: BAS.3.02.06 - Configure a Quote with Docebo Elevate Bundle - NB &lt;Opportunity Name&gt; - #1.1: BAS.3.02.06 - Configure a Quote with Docebo Elevate Bundle - NB $AT-NB-Dis-GT30-ARR-LTE75-Elevate
            [[(:name feature)
-             (str (:name scenario) " - #1." (inc (:index param)) ": " expanded-name)
+             ;; Special case - if expanded is the same - then it's slightly different
+             (if (= (:name scenario) expanded-name)
+               (str (:name scenario) " - #1." (inc (:index param)))
+               (str (:name scenario) " - #1." (inc (:index param)) ": " expanded-name))
              (:map param)] result]]))
          all-params)))
 
@@ -63,7 +66,12 @@
         outline? (= :gherkin/scenario-outline (:type scenario))
 
         start-line (:line (:location scenario))
-        end-line (if outline?
+        end-line (cond
+                   ;; Special case for empty steps scenario
+                   (empty? (:steps scenario))
+                   start-line
+
+                   outline?
                    ;; For outline need to extract examples as well
                    (let [start-examples (:line (:location (last (:examples scenario))))]
                      ;; Find end of examples sections - either end of file or empty line
@@ -75,6 +83,8 @@
                              i
                              (recur (inc i) (next coll))))
                          i)))
+
+                   :else
                    (:line (:location (last (:steps scenario)))))
 
         ;; Extract relevant scenario lines from source

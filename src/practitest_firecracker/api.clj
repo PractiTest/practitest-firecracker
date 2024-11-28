@@ -111,8 +111,7 @@
       {:type       "instances"
        :attributes {:set-id     testset-id
                     :test-id    (first test-id-num)
-                    :parameters (transform-keys (get (get testname-to-params (get test-id-testname (first test-id-num))) index)
-                                                name)}}))
+                    :parameters (get (get testname-to-params (get test-id-testname (first test-id-num))) index)}}))
 
 (defn has-duplicates? [key runs]
   (let [grouped (group-by key (into [] runs))]

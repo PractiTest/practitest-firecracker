@@ -3,7 +3,7 @@
     [clojure.tools.build.api :as b]))
 
 (def lib 'practitest/practitest-firecracker)
-(def version (format "2.1.%s" (b/git-count-revs nil)))
+(def version (format "2.2.%s" (b/git-count-revs nil)))
 (def class-dir "target/classes")
 (def uber-file (format "target/%s-%s-standalone.jar" (name lib) version))
 
