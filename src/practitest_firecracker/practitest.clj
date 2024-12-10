@@ -319,13 +319,16 @@
   (when display-action-logs (log/infof "make-runs"))
   (flatten (doall
              (for [[test-testset instances] instance-to-ts-test]
-               (map-indexed
-                 (fn [index instance]
+               (map
+                 (fn [instance]
                    (let [[_ test-id] test-testset
                          tst (first (get test-by-id test-id))
                          test-name (get tst 0)
-                         params (get test-name-to-params test-name)
-                         this-param  (get params index)
+                         this-param (:parameters (:attributes instance))
+                         ;; Use nil in case of empty params
+                         this-param (if (empty? this-param)
+                                      nil
+                                      this-param)
                          xml-test (get group-xml-tests [test-name this-param])
                          sys-test (get tst 1)
                          [run run-steps] (eval/sf-test-suite->run-def options (first xml-test) sys-test this-param)
