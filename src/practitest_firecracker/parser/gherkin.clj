@@ -36,7 +36,7 @@
 (defn- expand-scenario-outline
   [scenario feature]
   (let [examples (:examples scenario)
-        all-params (glue-example-arguments (first examples))]
+        all-params (mapcat glue-example-arguments examples)]
     (mapcat
       (fn [param]
         ;; Store params and values here for future reference
