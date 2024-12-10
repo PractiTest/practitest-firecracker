@@ -8,7 +8,16 @@ Feature: Identity feature
         Then I will get result <result> every time
 
     Examples:
+
             | arg           | result        |
             | "First Item"  | "First Item"  |
             | "Second Item" | "Second 123" |
             | "Third Item"  | "Third Item"  |
+
+    Examples:
+
+            | arg           | result        |
+            | "Second Part" | "Second Part" |
+            | "Failure"     | "That would fail" |
+
+    Scenario: Another schenario just in case

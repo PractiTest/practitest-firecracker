@@ -36,7 +36,7 @@
 (defn- expand-scenario-outline
   [scenario feature]
   (let [examples (:examples scenario)
-        all-params (glue-example-arguments (first examples))]
+        all-params (mapcat glue-example-arguments examples)]
     (mapcat
       (fn [param]
         ;; Store params and values here for future reference
@@ -58,6 +58,9 @@
              (:map param)] result]]))
          all-params)))
 
+(defn- examples-section-end? [line]
+  (str/starts-with? (str/lower-case (str/trim line)) "scenario:"))
+
 ;; TODO: tags support ??
 (defn- extract-scenario-source
   [feature-root scenario]
@@ -73,13 +76,13 @@
 
                    outline?
                    ;; For outline need to extract examples as well
-                   (let [start-examples (:line (:location (last (:examples scenario))))]
-                     ;; Find end of examples sections - either end of file or empty line
+                   (let [start-examples (:line (:location (first (:examples scenario))))]
+                     ;; Find end of examples sections - either end of file or new BDD scenario
                      (loop [i start-examples
                             coll (seq (drop start-examples feature-source))]
                        (if coll
                          (let [line (first coll)]
-                           (if (str/blank? line)
+                           (if (examples-section-end? line)
                              i
                              (recur (inc i) (next coll))))
                          i)))
