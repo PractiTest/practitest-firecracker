@@ -331,8 +331,8 @@
                                       this-param)
                          xml-test (get group-xml-tests [test-name this-param])
                          sys-test (get tst 1)
-                         [run run-steps] (eval/sf-test-suite->run-def options (first xml-test) sys-test this-param)
-                         additional-run-fields (eval/eval-additional-fields run (:additional-run-fields options))
+                         [_run-duration run-steps] (eval/sf-test-suite->run-def options (first xml-test) sys-test this-param)
+                         additional-run-fields (eval/eval-additional-fields (first xml-test) (:additional-run-fields options))
                          additional-run-fields (merge additional-run-fields (:system-fields additional-run-fields))
                          run (eval/sf-test-run->run-def additional-run-fields sys-test)]
                      {:instance-id (:id instance)
