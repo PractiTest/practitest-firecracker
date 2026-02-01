@@ -347,26 +347,28 @@
                (not specflow-scenario))
       (log/warn "Unable to detect BDD scenario for test" (:classname test) (:name test) " - will create FC test"))
 
-    (assoc test
-      :bdd-test? (some? bdd-scenario)
-      :gherkin-scenario bdd-scenario
-      ;; Extract scenario outline params to special arg (accessible via ?outline-params-row in firecracker config)
-      :outline-params-row (:row (:outline-params bdd-scenario))
-      :outline-params-map (:map (:outline-params bdd-scenario))
-      :errors (count (filter #(= (:failure-type %) :error) (:test-cases test)))
-      :failures (count (filter #(= (:failure-type %) :failure) (:test-cases test)))
-      :flakes (count (filter #(= (:failure-type %) :flake) (:test-cases test)))
-      :skipped (count (filter #(= (:failure-type %) :skipped) (:test-cases test)))
-      :tests (count (:test-cases test))
-      ;; :name                  name
-      ;; :name-test-suite       name
-      :suite-name (:suite-name test)
-      :pt-first-case-name (:name (first (:test-cases test)))
-      :pt-test-name name
-      :pt-name-combine (str name " - " (:name (first (:test-cases test))))
-      :time-elapsed (round (reduce + (map :time (:test-cases test))) :precision 3)
-      :full-class-name (:classname test)
-      :package-name package)))
+    (merge
+      ;; Computed defaults (lowest priority)
+      {:errors (count (filter #(= (:failure-type %) :error) (:test-cases test)))
+       :failures (count (filter #(= (:failure-type %) :failure) (:test-cases test)))
+       :flakes (count (filter #(= (:failure-type %) :flake) (:test-cases test)))
+       :skipped (count (filter #(= (:failure-type %) :skipped) (:test-cases test)))
+       :tests (count (:test-cases test))}
+      ;; Original XML attributes (higher priority - user settings override defaults)
+      test
+      ;; Required computed fields (highest priority - must be set)
+      {:bdd-test? (some? bdd-scenario)
+       :gherkin-scenario bdd-scenario
+       ;; Extract scenario outline params to special arg (accessible via ?outline-params-row in firecracker config)
+       :outline-params-row (:row (:outline-params bdd-scenario))
+       :outline-params-map (:map (:outline-params bdd-scenario))
+       :suite-name (:suite-name test)
+       :pt-first-case-name (:name (first (:test-cases test)))
+       :pt-test-name name
+       :pt-name-combine (str name " - " (:name (first (:test-cases test))))
+       :time-elapsed (round (reduce + (map :time (:test-cases test))) :precision 3)
+       :full-class-name (:classname test)
+       :package-name package})))
 
 (defn get-test-aggregations [test val {:keys [scenarios-map]
                                        :as options}]
