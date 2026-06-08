@@ -13,6 +13,7 @@
 (def ^:const bulk-list-tests-uri "/projects/%d/tests/bulk_search.json")
 (def ^:const list-testsets-uri "/projects/%d/sets.json")
 (def ^:const custom-field-uri "/projects/%d/custom_fields/%d.json")
+(def ^:const account-uri "/account.json")
 
 ;; Used when we get testset instances for multiple test ids
 ;; It's a GET request, so if we pass too many test IDs, we get the "URL too long" error

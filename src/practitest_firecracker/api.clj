@@ -61,12 +61,53 @@
             (throw-api-exception ex-info status body uri))
           (throw-api-exception ex-info status body uri))))))
 
+(defn parse-account-rate
+  "Extract the account's API limit as calls-per-minute from the /account.json
+   response body, or nil when it is missing/unparseable. The period is normally
+   60s, but normalize defensively so the value stays correct if it ever changes."
+  [body]
+  (let [{:keys [api-max api-max-period]} (get-in body [:data :attributes])]
+    (when (and (number? api-max) (number? api-max-period) (pos? api-max-period))
+      (quot (* api-max 60) api-max-period))))
+
+(defn fetch-account-api-max
+  "One un-throttled GET to discover the account's API rate limit (calls/min).
+   Returns nil on any error or non-200 (e.g. a backend without this endpoint),
+   so callers transparently fall back to the configured rate."
+  [base-uri credentials]
+  (try
+    (let [{:keys [status body]} (http/get (str base-uri account-uri)
+                                          {:basic-auth       credentials
+                                           :throw-exceptions false
+                                           :as               :json
+                                           :query-params     {:source "firecracker"
+                                                              :firecracker-version (get-current-version)}})]
+      (when (= status 200)
+        (parse-account-rate body)))
+    (catch Exception _e nil)))
+
+(defn effective-api-rate
+  "The rate FC should actually use: the lower of the configured rate and the
+   account's real limit. Falls back to the configured rate when the account
+   limit is unknown (nil)."
+  [configured-rate account-rate]
+  (if account-rate
+    (min configured-rate account-rate)
+    configured-rate))
+
 (defn make-client [{:keys [email api-token api-uri max-api-rate]}]
-  {:credentials            [email api-token]
-   :base-uri               (str api-uri
-                                (if (string/ends-with? api-uri "/") "" "/")
-                                "api/v2")
-   :max-api-rate-throttler (create-api-throttler max-api-rate)})
+  (let [base-uri     (str api-uri
+                          (if (string/ends-with? api-uri "/") "" "/")
+                          "api/v2")
+        credentials  [email api-token]
+        account-rate (fetch-account-api-max base-uri credentials)
+        rate         (effective-api-rate max-api-rate account-rate)]
+    (when (and account-rate (< account-rate max-api-rate))
+      (log/warnf "--max-api-rate=%s exceeds account API limit %s/min; throttling at %s/min"
+                 max-api-rate account-rate rate))
+    {:credentials            credentials
+     :base-uri               base-uri
+     :max-api-rate-throttler (create-api-throttler rate)}))
 
 (defn ll-testset-instances [{:keys [base-uri credentials max-api-rate-throttler]} [project-id display-action-logs] testset-id test-ids]
   (when display-action-logs (log/infof "get instances from testsets %s" testset-id))

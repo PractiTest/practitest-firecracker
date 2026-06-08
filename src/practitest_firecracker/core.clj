@@ -113,10 +113,10 @@
                              :scenarios-map scenarios-map
                              :sample false)
         additional-reports (send-directory parsed-dirs options)
-        start-time         (t/now)
+        start-time         (t/now)]
 
 
-        ]
+
 
     (-> (create-testsets client options additional-reports)
         (group-tests client options)
