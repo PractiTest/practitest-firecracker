@@ -17,5 +17,3 @@ config.json
 /.lsp/.cache
 /.clj-kondo/.cache
 /.mise.toml
-/.idea/
-*.iml
