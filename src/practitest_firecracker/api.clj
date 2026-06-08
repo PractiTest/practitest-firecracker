@@ -62,13 +62,12 @@
           (throw-api-exception ex-info status body uri))))))
 
 (defn parse-account-rate
-  "Extract the account's API limit as calls-per-minute from the /account.json
-   response body, or nil when it is missing/unparseable. The period is normally
-   60s, but normalize defensively so the value stays correct if it ever changes."
+  "Read the account's API limit (calls per minute) from the /account.json
+   response body, or nil when it is missing/unparseable."
   [body]
-  (let [{:keys [api-max api-max-period]} (get-in body [:data :attributes])]
-    (when (and (number? api-max) (number? api-max-period) (pos? api-max-period))
-      (quot (* api-max 60) api-max-period))))
+  (let [api-max (get-in body [:data :attributes :api-max])]
+    (when (and (number? api-max) (pos? api-max))
+      api-max)))
 
 (defn fetch-account-api-max
   "One un-throttled GET to discover the account's API rate limit (calls/min).
@@ -76,7 +75,7 @@
    so callers transparently fall back to the configured rate."
   [base-uri credentials]
   (try
-    (let [{:keys [status body]} (http/get (str base-uri account-uri)
+    (let [{:keys [status body]} (http/get (build-uri base-uri account-uri)
                                           {:basic-auth       credentials
                                            :throw-exceptions false
                                            :as               :json

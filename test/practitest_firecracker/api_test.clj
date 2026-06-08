@@ -12,10 +12,10 @@
     (is (= 300 (api/effective-api-rate 300 nil)))))
 
 (deftest parse-account-rate-test
-  (testing "reads calls-per-minute from the account.json envelope"
-    (is (= 30 (api/parse-account-rate {:data {:attributes {:api-max 30 :api-max-period 60}}}))))
-  (testing "normalizes to per-minute when the period is not 60 seconds"
-    (is (= 20 (api/parse-account-rate {:data {:attributes {:api-max 10 :api-max-period 30}}}))))
-  (testing "returns nil when attributes are missing or unparseable"
+  (testing "reads calls-per-minute (api-max) from the account.json envelope"
+    (is (= 30 (api/parse-account-rate {:data {:attributes {:api-max 30}}})))
+    (is (= 120 (api/parse-account-rate {:data {:attributes {:api-max 120}}}))))
+  (testing "returns nil when api-max is missing or invalid"
     (is (nil? (api/parse-account-rate {:data {:attributes {}}})))
-    (is (nil? (api/parse-account-rate {})))))
+    (is (nil? (api/parse-account-rate {})))
+    (is (nil? (api/parse-account-rate {:data {:attributes {:api-max 0}}})))))
