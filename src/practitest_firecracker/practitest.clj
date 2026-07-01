@@ -10,17 +10,18 @@
     [practitest-firecracker.eval :as eval]
     [clojure.pprint :as pprint]))
 
-(defn find-sf-testset [client [project-id display-action-logs] options testset-name]
+(defn find-sf-testset [client [project-id display-action-logs] options testset-name representative-suite]
   (let [testset (api/ll-find-testset client [project-id display-action-logs] testset-name)]
     (when testset
-      (eval/update-sf-testset client options testset-name testset (read-string (:id testset))))))
+      (eval/update-sf-testset client options testset-name representative-suite (read-string (:id testset))))))
 
 (defn create-testsets [client {:keys [project-id display-action-logs] :as options} xml]
   (doall
     (for [sf-test-suites xml]
       (let [testset-name (or (:name (:attrs sf-test-suites) (:name sf-test-suites)))
-            testset (or (find-sf-testset client [project-id display-action-logs] options testset-name)
-                        (eval/create-sf-testset client options (:test-cases sf-test-suites) testset-name))]
+            representative-suite (first (:test-list sf-test-suites))
+            testset (or (find-sf-testset client [project-id display-action-logs] options testset-name representative-suite)
+                        (eval/create-sf-testset client options (:test-cases sf-test-suites) testset-name representative-suite))]
         {(:id testset) (:test-list sf-test-suites)}))))
 
 (defn group-tests [testsets _ options]
