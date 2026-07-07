@@ -39,7 +39,7 @@
                     api/ll-update-testset           (fn [_client _pdisplay attributes _steps _cf-id]
                                                       (reset! captured attributes)
                                                       {:id "999"})]
-        (eval/update-sf-testset nil options "My TestSet" representative 999))
+        (eval/update-sf-testset nil options "My TestSet" {} representative 999))
       (is (= "ci-runner-9" (get-in @captured [:custom-fields (keyword "---f-345678")]))
           "dynamic ?hostname must resolve to the suite value")
       (is (= "Salesforce" (get-in @captured [:custom-fields (keyword "---f-66666")]))

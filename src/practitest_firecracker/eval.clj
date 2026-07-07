@@ -93,16 +93,18 @@
                     step-defs
                     (read-string (:id test)))))
 
-(defn update-sf-testset [client {:keys [project-id display-action-logs] :as options} testset-name representative-suite testset-id]
-  (let [additional-testset-fields (eval-additional-fields representative-suite (:additional-testset-fields options))
+(defn update-sf-testset [client {:keys [project-id display-action-logs] :as options} testset-name sf-test-suite representative-suite testset-id]
+  (let [[test-def step-defs] (sf-test-suite->test-def options sf-test-suite)
+        additional-testset-fields (eval-additional-fields representative-suite (:additional-testset-fields options))
         additional-testset-fields (merge additional-testset-fields (:system-fields additional-testset-fields))]
     (ensure-custom-field-values client [project-id display-action-logs] (:custom-fields additional-testset-fields))
     (api/ll-update-testset client
                        [project-id display-action-logs]
-                       (merge {:name testset-name}
+                       (merge test-def
+                              {:name testset-name}
                               {:author-id (:author-id options)}
                               additional-testset-fields)
-                       []
+                       step-defs
                        testset-id)))
 
 (defn create-sf-testset [client options sf-test-suites testset-name representative-suite]

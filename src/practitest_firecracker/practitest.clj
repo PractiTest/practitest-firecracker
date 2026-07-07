@@ -13,7 +13,7 @@
 (defn find-sf-testset [client [project-id display-action-logs] options testset-name representative-suite]
   (let [testset (api/ll-find-testset client [project-id display-action-logs] testset-name)]
     (when testset
-      (eval/update-sf-testset client options testset-name representative-suite (read-string (:id testset))))))
+      (eval/update-sf-testset client options testset-name testset representative-suite (read-string (:id testset))))))
 
 (defn create-testsets [client {:keys [project-id display-action-logs] :as options} xml]
   (doall
