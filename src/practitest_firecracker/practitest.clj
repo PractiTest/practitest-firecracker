@@ -19,7 +19,7 @@
   (doall
     (for [sf-test-suites xml]
       (let [testset-name (or (:name (:attrs sf-test-suites) (:name sf-test-suites)))
-            representative-suite (first (:test-list sf-test-suites))
+            representative-suite (:suite-attrs sf-test-suites)
             testset (or (find-sf-testset client [project-id display-action-logs] options testset-name representative-suite)
                         (eval/create-sf-testset client options (:test-cases sf-test-suites) testset-name representative-suite))]
         {(:id testset) (:test-list sf-test-suites)}))))

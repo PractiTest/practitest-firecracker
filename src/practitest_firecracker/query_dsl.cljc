@@ -110,20 +110,16 @@
                 :else                                 (str query))))))
 
 (defn read-query [s]
-  (let [query    (edn/read-string s)
-        compiler (fn compile-query [query]
-                   (if (list? query)
-                     (let [[op & args] query]
-                       {:op   (compile-query op)
-                        :args (vec (map compile-query args))})
-                     query))]
-    (if (not (or (number? query)
-                 (string? query)
-                 (double? query)
-                 (nil? query)))
-               (with-meta (compiler query)
-                          {:query true})
-               (compiler query))))
+  (if (and (string? s) (re-find #"^\s*[?(]" s))
+    (let [query    (edn/read-string s)
+          compiler (fn compile-query [query]
+                     (if (list? query)
+                       (let [[op & args] query]
+                         {:op   (compile-query op)
+                          :args (vec (map compile-query args))})
+                       query))]
+      (with-meta (compiler query) {:query true}))
+    s))
 
 (defn try-read-query [s]
   #?(:cljs

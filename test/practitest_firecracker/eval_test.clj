@@ -9,7 +9,8 @@
   (parse-additional-fields
     (json/generate-string
       {:custom-fields {"---f-345678" "?hostname"
-                       "---f-66666"  "Salesforce"}})))
+                       "---f-66666"  "Salesforce"
+                       "---f-77777"  "Salesforce Inc"}})))
 
 (deftest create-sf-testset-resolves-dynamic-and-constant-fields
   (testing "create-sf-testset resolves query-DSL against the representative suite"
@@ -26,7 +27,9 @@
       (is (= "ci-runner-7" (get-in @captured [:custom-fields (keyword "---f-345678")]))
           "dynamic ?hostname must resolve to the suite value")
       (is (= "Salesforce" (get-in @captured [:custom-fields (keyword "---f-66666")]))
-          "constant value must pass through unchanged"))))
+          "constant value must pass through unchanged")
+      (is (= "Salesforce Inc" (get-in @captured [:custom-fields (keyword "---f-77777")]))
+          "multi-word constant value must not be truncated to its first word"))))
 
 (deftest update-sf-testset-resolves-dynamic-and-constant-fields
   (testing "update-sf-testset resolves query-DSL against the representative suite"
@@ -43,4 +46,6 @@
       (is (= "ci-runner-9" (get-in @captured [:custom-fields (keyword "---f-345678")]))
           "dynamic ?hostname must resolve to the suite value")
       (is (= "Salesforce" (get-in @captured [:custom-fields (keyword "---f-66666")]))
-          "constant value must pass through unchanged"))))
+          "constant value must pass through unchanged")
+      (is (= "Salesforce Inc" (get-in @captured [:custom-fields (keyword "---f-77777")]))
+          "multi-word constant value must not be truncated to its first word"))))
