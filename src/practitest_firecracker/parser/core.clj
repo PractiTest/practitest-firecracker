@@ -421,13 +421,14 @@
     testsuite-list))
 
 (defn merged-testset [testsets tests testset-name]
-  (list {:tag       :testsuite
-         :test-list tests
-         :name      testset-name
-         :tests     (reduce + (map #(str-to-number %) (map :tests testsets)))
-         :time      (reduce + (map #(str-to-number %) (map :time testsets)))
-         :failures  (reduce + (map #(str-to-number %) (map :failues testsets)))
-         :skipped   (reduce + (map #(str-to-number %) (map :skipped testsets)))
+  (list {:tag         :testsuite
+         :test-list   tests
+         :name        testset-name
+         :suite-attrs (:attrs (first testsets))
+         :tests       (reduce + (map #(str-to-number %) (map :tests testsets)))
+         :time        (reduce + (map #(str-to-number %) (map :time testsets)))
+         :failures    (reduce + (map #(str-to-number %) (map :failues testsets)))
+         :skipped     (reduce + (map #(str-to-number %) (map :skipped testsets)))
          }))
 
 (defn merge-testsets [testsets testset-name]
