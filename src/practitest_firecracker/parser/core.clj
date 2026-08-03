@@ -451,11 +451,20 @@
         filtered-paths (for [file filtered-files] (.getAbsolutePath file))]
     filtered-paths))
 
+(defn- parse-file
+  "Parse a single XML report file. Empty/whitespace-only or malformed files are
+   skipped with a warning so one bad file does not abort the whole run."
+  [path]
+  (let [content (slurp path)]
+    (if (str/blank? content)
+      (log/warn "Skipping empty XML report file:" path)
+      (try
+        (zip-str content)
+        (catch Exception e
+          (log/warn "Skipping unparseable XML report file:" path "-" (.getMessage e)))))))
+
 (defn parse-files [directory]
-  (let [filtered-paths (get-files-path directory ".xml")
-        files          (for [path filtered-paths] (slurp path))
-        parsed-files   (for [file files] (zip-str file))]
-    parsed-files))
+  (keep parse-file (get-files-path directory ".xml")))
 
 (defn merge-results [parsed-files {:keys [multitestset
                                           testset-name]

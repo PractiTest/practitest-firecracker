@@ -102,3 +102,16 @@
         (read-query "(get 1 [\"val\"])")
         {:op 'get
          :args [1 ["val"]]}))))
+
+(deftest test-read-query-static-values
+  (testing "multi-word static value is preserved verbatim, not truncated to the first word"
+    (is (= "In Progress" (read-query "In Progress")))
+    (is (= "In Progress" (eval-query {:name "x"} (read-query "In Progress")))))
+  (testing "static value is not flagged as a query, so additional fields pass it through unchanged"
+    (is (not (query? (read-query "In Progress")))))
+  (testing "single-word static value still works"
+    (is (= "Regression" (eval-query {:name "x"} (read-query "Regression")))))
+  (testing "DSL function calls and field references still parse as queries"
+    (is (= {:op 'get :args [1 ["val"]]} (read-query "(get 1 [\"val\"])")))
+    (is (query? (read-query "(get 1 [\"val\"])")))
+    (is (query? (read-query "?package-name")))))

@@ -109,8 +109,18 @@
                 (string/starts-with? (str query) "?") (str "")
                 :else                                 (str query))))))
 
+(defn dsl-expression? [s]
+  ;; DSL values are either function calls "(...)" or field references "?...".
+  ;; Anything else is a static literal and must be preserved verbatim - feeding it
+  ;; to edn/read-string would truncate it to the first whitespace-delimited token
+  ;; (e.g. "In Progress" -> 'In).
+  (let [trimmed (string/triml s)]
+    (or (string/starts-with? trimmed "(")
+        (string/starts-with? trimmed "?"))))
+
 (defn read-query [s]
-  (if (and (string? s) (re-find #"^\s*[?(]" s))
+  (if (and (string? s) (not (dsl-expression? s)))
+    s
     (let [query    (edn/read-string s)
           compiler (fn compile-query [query]
                      (if (list? query)
@@ -118,8 +128,13 @@
                          {:op   (compile-query op)
                           :args (vec (map compile-query args))})
                        query))]
-      (with-meta (compiler query) {:query true}))
-    s))
+      (if (not (or (number? query)
+                   (string? query)
+                   (double? query)
+                   (nil? query)))
+        (with-meta (compiler query)
+                   {:query true})
+        (compiler query)))))
 
 (defn try-read-query [s]
   #?(:cljs
